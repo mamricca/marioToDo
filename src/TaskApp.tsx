@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TaskInput } from "./components/TaskInput";
+import { CaptureInput } from "./components/CaptureInput";
 import { TaskList } from "./components/TaskList";
-import { FilterBar } from "./components/FilterBar";
+import { Filters } from "./components/Filters";
+import { Toast } from "./components/Toast";
 import { parseLine } from "./parser";
+import { colophonText, formatKicker, countPhrase, priorityClause } from "./format";
 import {
   fetchTasks,
   insertTask,
@@ -10,7 +12,10 @@ import {
   updateTaskDone,
   deleteTaskById,
 } from "./lib/tasksApi";
-import type { Task, Filter } from "./types";
+import type { Task, TagFilter, View } from "./types";
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const UNDO_WINDOW_MS = 5000;
 
 interface TaskAppProps {
   userId: string;
@@ -23,9 +28,11 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>({ type: "all", value: null });
-  const [showArchived, setShowArchived] = useState(false);
+  const [view, setView] = useState<View>("active");
+  const [tagFilter, setTagFilter] = useState<TagFilter | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingDeleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchTasks()
@@ -60,6 +67,12 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteTimeout.current) clearTimeout(pendingDeleteTimeout.current);
+    };
+  }, []);
+
   const addTask = async (raw: string) => {
     const parsed = parseLine(raw);
     try {
@@ -81,15 +94,6 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     }
   };
 
-  const deleteTask = async (id: string) => {
-    try {
-      await deleteTaskById(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-    }
-  };
-
   const editTask = async (id: string, newRaw: string) => {
     const parsed = parseLine(newRaw);
     try {
@@ -98,6 +102,39 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
     }
+  };
+
+  const finalizeDelete = async (task: Task) => {
+    try {
+      await deleteTaskById(task.id);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const deleteTask = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    // Only one pending undo at a time — finalize any previous one right away.
+    if (pendingDelete) {
+      if (pendingDeleteTimeout.current) clearTimeout(pendingDeleteTimeout.current);
+      finalizeDelete(pendingDelete);
+    }
+
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setPendingDelete(task);
+    pendingDeleteTimeout.current = setTimeout(() => {
+      finalizeDelete(task);
+      setPendingDelete(null);
+    }, UNDO_WINDOW_MS);
+  };
+
+  const undoDelete = () => {
+    if (!pendingDelete) return;
+    if (pendingDeleteTimeout.current) clearTimeout(pendingDeleteTimeout.current);
+    setTasks((prev) => [...prev, pendingDelete]);
+    setPendingDelete(null);
   };
 
   const { projects, contexts } = useMemo(() => {
@@ -115,78 +152,92 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
 
   const activeTasks = tasks.filter((t) => !t.done);
   const archivedTasks = tasks.filter((t) => t.done);
+  const viewTasks = view === "active" ? activeTasks : archivedTasks;
 
-  const filteredActive = activeTasks.filter((t) => {
-    if (filter.type === "project") return t.projects.includes(filter.value!);
-    if (filter.type === "context") return t.contexts.includes(filter.value!);
-    return true;
+  const displayedTasks = viewTasks.filter((t) => {
+    if (!tagFilter) return true;
+    return tagFilter.type === "project"
+      ? t.projects.includes(tagFilter.value)
+      : t.contexts.includes(tagFilter.value);
   });
+
+  const priorityCount = activeTasks.filter((t) => t.priority).length;
+  const completedThisWeek = archivedTasks.filter(
+    (t) => t.completedAt && Date.now() - t.completedAt < WEEK_MS
+  ).length;
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="app-header-top">
-          <h1>Todos</h1>
-          <div className="account">
-            <span className="account-email">{userEmail}</span>
-            <button type="button" onClick={onSignOut}>
-              Salir
-            </button>
-          </div>
+      <div className="masthead">
+        <div className="kicker">{formatKicker(new Date())}</div>
+        <div className="headline">
+          {countPhrase(activeTasks.length, "pendiente", "pendientes", "m")}
+          {priorityCount > 0 && (
+            <span className="accent">{priorityClause(priorityCount)}</span>
+          )}
         </div>
-        <TaskInput ref={inputRef} onSubmit={addTask} initialValue={initialDraft} />
-        <p className="hint">
-          Presioná <kbd>/</kbd> para enfocar el input · sintaxis:{" "}
-          <code>(A) texto +proyecto @contexto https://url</code>
-        </p>
-        {errorMessage && (
-          <p className="error-banner" onClick={() => setErrorMessage(null)}>
-            {errorMessage}
-          </p>
-        )}
-      </header>
+      </div>
 
-      <FilterBar
-        projects={projects}
-        contexts={contexts}
-        activeTasks={activeTasks}
-        filter={filter}
-        onChange={setFilter}
-        showArchived={showArchived}
-        onToggleArchived={() => setShowArchived((v) => !v)}
-        archivedCount={archivedTasks.length}
+      <div className="session">
+        <span>{userEmail}</span>
+        <button type="button" className="btn-ghost" onClick={onSignOut}>
+          Salir
+        </button>
+      </div>
+
+      <CaptureInput
+        ref={inputRef}
+        onSubmit={addTask}
+        initialValue={initialDraft}
+        knownProjects={projects}
+        knownContexts={contexts}
       />
 
-      <main>
-        {loading ? (
-          <p className="empty-message">
-            <span className="spinner" /> Cargando...
-          </p>
-        ) : (
-          <>
-            <TaskList
-              tasks={filteredActive}
-              onToggle={toggleTask}
-              onDelete={deleteTask}
-              onEdit={editTask}
-              emptyMessage="No hay tareas pendientes en esta vista."
-            />
+      {errorMessage && (
+        <p className="error-banner" onClick={() => setErrorMessage(null)}>
+          {errorMessage}
+        </p>
+      )}
 
-            {showArchived && (
-              <section className="archived-section">
-                <h2>Archivadas</h2>
-                <TaskList
-                  tasks={archivedTasks}
-                  onToggle={toggleTask}
-                  onDelete={deleteTask}
-                  onEdit={editTask}
-                  emptyMessage="Todavía no archivaste ninguna tarea."
-                />
-              </section>
-            )}
-          </>
-        )}
-      </main>
+      <Filters
+        view={view}
+        onViewChange={setView}
+        projects={projects}
+        contexts={contexts}
+        viewTasks={viewTasks}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+      />
+
+      {loading ? (
+        <p className="empty-message">
+          <span className="spinner" /> Cargando...
+        </p>
+      ) : (
+        <TaskList
+          tasks={displayedTasks}
+          onToggle={toggleTask}
+          onDelete={deleteTask}
+          onEdit={editTask}
+          emptyMessage={
+            view === "active"
+              ? "No hay tareas pendientes en esta vista."
+              : "Todavía no archivaste ninguna tarea."
+          }
+        />
+      )}
+
+      <div className="colophon">
+        {colophonText(activeTasks.length, completedThisWeek)}
+      </div>
+
+      {pendingDelete && (
+        <Toast
+          message="Tarea borrada"
+          actionLabel="deshacer"
+          onAction={undoDelete}
+        />
+      )}
     </div>
   );
 }

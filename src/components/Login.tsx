@@ -24,32 +24,36 @@ export function Login() {
 
   return (
     <div className="login-screen">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Todos</h1>
-        <p className="login-hint">Iniciá sesión con tu email y contraseña.</p>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="vos@ejemplo.com"
-          autoComplete="email"
-          required
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Contraseña"
-          autoComplete="current-password"
-          required
-        />
-        <button type="submit" disabled={status === "sending"}>
-          {status === "sending" ? "Entrando..." : "Iniciar sesión"}
-        </button>
-        {status === "error" && (
-          <p className="login-error">Error: {errorMessage}</p>
-        )}
-      </form>
+      <div className="login-card">
+        <div className="kicker">Todos</div>
+        <div className="headline">
+          Iniciá <span className="accent">sesión</span>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="vos@ejemplo.com"
+            autoComplete="email"
+            required
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Contraseña"
+            autoComplete="current-password"
+            required
+          />
+          <button type="submit" disabled={status === "sending"}>
+            {status === "sending" ? "entrando…" : "entrar"}
+          </button>
+          {status === "error" && (
+            <p className="login-error">Error: {errorMessage}</p>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

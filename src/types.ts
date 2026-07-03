@@ -13,9 +13,11 @@ export interface Task {
   completedAt: number | null;
 }
 
-export type FilterType = "all" | "project" | "context";
+/** Which of the two mutually-exclusive tabs is showing. */
+export type View = "active" | "archived";
 
-export interface Filter {
-  type: FilterType;
-  value: string | null;
+/** Optional tag chip filtering within the current view. */
+export interface TagFilter {
+  type: "project" | "context";
+  value: string;
 }

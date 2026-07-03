@@ -9,8 +9,8 @@ import os
 OUT = os.path.join(os.path.dirname(__file__), "..", "public", "icons")
 os.makedirs(OUT, exist_ok=True)
 
-BG = (91, 140, 255, 255)   # accent blue, matches --accent in src/App.css
-FG = (255, 255, 255, 255)  # white checkmark
+BG = (224, 101, 79, 255)  # ink red, matches --accent in src/App.css
+FG = (237, 234, 226, 255)  # bone white, matches --ink in src/App.css
 
 
 def draw_checkmark(draw, size, stroke_ratio=0.11, scale=1.0):
@@ -38,7 +38,7 @@ def make_icon(size, path, rounded=True, safe_scale=1.0):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     if rounded:
-        radius = int(size * 0.22)
+        radius = int(size * 0.06)
         draw.rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=BG)
     else:
         draw.rectangle([0, 0, size - 1, size - 1], fill=BG)

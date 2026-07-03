@@ -1,5 +1,5 @@
 import type { Task } from "../types";
-import { TaskItem } from "./TaskItem";
+import { TaskRow } from "./TaskRow";
 
 interface TaskListProps {
   tasks: Task[];
@@ -32,9 +32,9 @@ export function TaskList({
   }
 
   return (
-    <ul className="task-list">
+    <div className="tasks">
       {sortTasks(tasks).map((task) => (
-        <TaskItem
+        <TaskRow
           key={task.id}
           task={task}
           onToggle={onToggle}
@@ -42,6 +42,6 @@ export function TaskList({
           onEdit={onEdit}
         />
       ))}
-    </ul>
+    </div>
   );
 }
