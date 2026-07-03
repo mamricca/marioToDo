@@ -149,6 +149,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
       <FilterBar
         projects={projects}
         contexts={contexts}
+        activeTasks={activeTasks}
         filter={filter}
         onChange={setFilter}
         showArchived={showArchived}
@@ -158,7 +159,9 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
 
       <main>
         {loading ? (
-          <p className="empty-message">Cargando...</p>
+          <p className="empty-message">
+            <span className="spinner" /> Cargando...
+          </p>
         ) : (
           <>
             <TaskList

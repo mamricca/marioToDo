@@ -11,7 +11,12 @@ function App() {
   const [initialDraft] = useState(() => consumeShareTarget());
 
   if (loading) {
-    return <div className="app-loading">Cargando...</div>;
+    return (
+      <div className="app-loading">
+        <span className="spinner" />
+        Cargando...
+      </div>
+    );
   }
 
   if (!session) {

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Task } from "../types";
 import { TaskText } from "./TaskText";
+
+const COMPLETE_TRANSITION_MS = 220;
 
 interface TaskItemProps {
   task: Task;
@@ -12,6 +14,14 @@ interface TaskItemProps {
 export function TaskItem({ task, onToggle, onDelete, onEdit }: TaskItemProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.raw);
+  const [completing, setCompleting] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const commitEdit = () => {
     const trimmed = draft.trim();
@@ -23,12 +33,28 @@ export function TaskItem({ task, onToggle, onDelete, onEdit }: TaskItemProps) {
     setEditing(false);
   };
 
+  const handleToggle = () => {
+    if (!task.done) {
+      // Marking as done: play a brief fade-out before it moves to Archivadas.
+      setCompleting(true);
+      timeoutRef.current = setTimeout(() => {
+        onToggle(task.id);
+      }, COMPLETE_TRANSITION_MS);
+    } else {
+      onToggle(task.id);
+    }
+  };
+
   return (
-    <li className={`task-item${task.done ? " done" : ""}`}>
+    <li
+      className={`task-item${task.done ? " done" : ""}${
+        completing ? " completing" : ""
+      }`}
+    >
       <input
         type="checkbox"
-        checked={task.done}
-        onChange={() => onToggle(task.id)}
+        checked={task.done || completing}
+        onChange={handleToggle}
         aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"}
       />
 

@@ -1,8 +1,9 @@
-import type { Filter } from "../types";
+import type { Filter, Task } from "../types";
 
 interface FilterBarProps {
   projects: string[];
   contexts: string[];
+  activeTasks: Task[];
   filter: Filter;
   onChange: (filter: Filter) => void;
   showArchived: boolean;
@@ -13,6 +14,7 @@ interface FilterBarProps {
 export function FilterBar({
   projects,
   contexts,
+  activeTasks,
   filter,
   onChange,
   showArchived,
@@ -29,7 +31,7 @@ export function FilterBar({
           className={isActive("all", null) ? "active" : ""}
           onClick={() => onChange({ type: "all", value: null })}
         >
-          Todas
+          Todas <span className="filter-count">{activeTasks.length}</span>
         </button>
       </div>
 
@@ -42,7 +44,10 @@ export function FilterBar({
               className={isActive("project", p) ? "active" : ""}
               onClick={() => onChange({ type: "project", value: p })}
             >
-              +{p}
+              +{p}{" "}
+              <span className="filter-count">
+                {activeTasks.filter((t) => t.projects.includes(p)).length}
+              </span>
             </button>
           ))}
         </div>
@@ -57,7 +62,10 @@ export function FilterBar({
               className={isActive("context", c) ? "active" : ""}
               onClick={() => onChange({ type: "context", value: c })}
             >
-              @{c}
+              @{c}{" "}
+              <span className="filter-count">
+                {activeTasks.filter((t) => t.contexts.includes(c)).length}
+              </span>
             </button>
           ))}
         </div>
@@ -68,7 +76,7 @@ export function FilterBar({
           className={showArchived ? "active" : ""}
           onClick={onToggleArchived}
         >
-          Archivadas ({archivedCount})
+          Archivadas <span className="filter-count">{archivedCount}</span>
         </button>
       </div>
     </nav>
