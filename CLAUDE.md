@@ -7,10 +7,10 @@ todo.txt, pensada para vivir 24/7 en Android y PC con hosting gratis.
 
 - Vite + React + TypeScript, sin librerías de estado ni UI kit.
 - CSS plano (`src/App.css`), tema oscuro por defecto.
-- Datos: Supabase (Postgres + auth por magic link, RLS por `user_id`).
-- Deploy: Cloudflare Pages o Vercel (free tier).
+- Datos: Supabase (Postgres + auth por email/contraseña, RLS por `user_id`).
+- Deploy: Vercel (free tier), conectado a GitHub para deploy automático.
 
-## Estado actual: Paso 4 completo — deployado
+## Estado actual: Paso 4 completo — deployado, con accesos rápidos
 
 **URL de producción: https://mario-to-do.vercel.app**
 
@@ -24,13 +24,60 @@ todo.txt, pensada para vivir 24/7 en Android y PC con hosting gratis.
   para que rutas como `/share-target` (que no existen como archivo)
   las resuelva el router del lado del cliente en vez de tirar 404.
 - Verificado en producción (HTTPS real): manifest, service worker,
-  íconos y `/share-target` responden bien; login por magic link
-  probado end-to-end contra el dominio de Vercel (para esto hubo que
-  agregar `https://mario-to-do.vercel.app` a Redirect URLs / Site URL
-  en Supabase → Authentication → URL Configuration).
-- Pendiente de confirmar por el usuario: instalar la PWA en el
-  Samsung S23 Ultra y probar que "Todos" aparezca en el share sheet
-  de Android al compartir un link desde Chrome.
+  íconos y `/share-target` responden bien. Login, PWA instalada y
+  share target de Android probados end-to-end contra el dominio de
+  Vercel.
+
+### Login: email + contraseña (no magic link)
+
+Se cambió de magic link a `signInWithPassword` porque el servicio de
+email compartido de Supabase (el que manda los magic links por
+defecto) tiene un rate limit muy bajo, pensado solo para pruebas —
+con un solo usuario probando seguido se agotaba enseguida.
+
+- `src/components/Login.tsx` pide email + contraseña y llama
+  `supabase.auth.signInWithPassword`.
+- La contraseña se setea (o cambia) con `scripts/set-password.mjs`,
+  un script one-off que usa la **service_role key** de Supabase (no
+  la anon key) para setearla vía Admin API sin mandar ningún email.
+  Uso: variables de entorno `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `EMAIL`, `PASSWORD` en la terminal (nunca se guardan en archivo) y
+  `node scripts/set-password.mjs`. La service_role key nunca va en
+  `.env` del proyecto ni se commitea — es de un solo uso manual.
+- Si en algún momento se quiere volver a habilitar magic link (por
+  ejemplo si se agrega un SMTP propio), sería agregar de nuevo el
+  flujo `signInWithOtp` — no hay nada más atado a la decisión actual.
+
+### Accesos rápidos (lo pedido como "nice to have", ya resuelto)
+
+- **Atajo de teclado en PC** (`Ctrl+Alt+T`, elegido por el usuario):
+  no es código de la app, es una "Tecla de método abreviado" seteada
+  a nivel Windows sobre el acceso directo (`.lnk`) que crea Edge al
+  instalar la PWA. Se configura así: Menú Inicio → buscar "Todos" →
+  click derecho → Abrir ubicación del archivo → click derecho sobre
+  el `.lnk` → Propiedades → pestaña "Acceso directo" → campo "Tecla
+  de método abreviado" → presionar una letra (Windows arma
+  `Ctrl+Alt+<letra>` solo). Si el `.lnk` apunta a `localhost` en vez
+  del dominio de producción, hay que reinstalar la PWA desde la URL
+  real — la sesión de login queda guardada por origen, así que un
+  `.lnk` viejo a localhost nunca va a recordar la sesión de producción.
+- **Compartir un link desde Edge/PC → Todos**: se probó el share
+  nativo de Windows (ícono "Compartir" de Edge → panel de Windows) y
+  **no lista PWAs instaladas como destino** en este equipo — no es
+  confiable. En su lugar se usa un **bookmarklet** en la barra de
+  favoritos que reutiliza la misma ruta `/share-target` que ya existe
+  para Android:
+  ```
+  javascript:(function(){window.open('https://mario-to-do.vercel.app/share-target?title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'_blank')})()
+  ```
+  Se instala editando la URL de un favorito (pegar ese código como
+  URL). Al clickearlo en cualquier página, abre una pestaña nueva de
+  Todos con el input precargado con título + link de esa página. Cero
+  código nuevo — corre 100% sobre la infraestructura de share target
+  que ya estaba armada para el celular.
+- **Acceso rápido desde el Samsung S23 Ultra** (atajo estilo
+  accesibilidad, sin pasar por el share sheet): sigue pendiente,
+  anotado para revisar más adelante.
 
 ## Estado anterior: Paso 3 — PWA instalable + Share Target
 
@@ -51,15 +98,14 @@ npm run dev
    `auth.uid() = user_id`).
 3. En Project Settings → API, copiar `Project URL` y `anon public key`
    a `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-4. En Authentication → URL Configuration, agregar la URL donde corra
-   la app (`http://localhost:5173` en dev, el dominio de producción
-   más adelante) a "Redirect URLs" para que el magic link funcione.
-5. `npm run dev` y entrar con el propio email (magic link, sin
-   password — es una app de un solo usuario).
+4. Setear la contraseña del usuario con `scripts/set-password.mjs`
+   (ver sección de login arriba) — no hace falta configurar Redirect
+   URLs para magic link porque ya no se usa.
+5. `npm run dev` y entrar con el propio email + esa contraseña.
 
 ### Qué hace
 
-- Login por magic link (`src/components/Login.tsx` +
+- Login por email + contraseña (`src/components/Login.tsx` +
   `src/hooks/useAuth.ts`): sin sesión no se ve nada de la app.
 - Input de captura rápida (`src/components/TaskInput.tsx`) que acepta
   líneas estilo todo.txt: `(A) Terminar informe +trabajo @compu https://ejemplo.com`
@@ -97,11 +143,11 @@ npm run dev
   pide el requisito de "soporte offline básico".
 - Share Target (`src/shareTarget.ts`): la entrada `share_target` del
   manifest registra `/share-target` como destino del share sheet de
-  Android (method GET, params `title`/`text`/`url`). Al abrir esa
-  ruta, se arma una línea todo.txt con esos valores (sin duplicar si
-  coinciden) y se precarga+enfoca el input de captura para que
-  revises/agregues tags y confirmes con Enter — no se guarda solo
-  automáticamente.
+  Android (method GET, params `title`/`text`/`url`) y también del
+  bookmarklet de escritorio (ver arriba). Al abrir esa ruta, se arma
+  una línea todo.txt con esos valores (sin duplicar si coinciden) y
+  se precarga+enfoca el input de captura para que revises/agregues
+  tags y confirmes con Enter — no se guarda solo automáticamente.
 
 ### Estructura
 
@@ -116,7 +162,7 @@ src/
   hooks/
     useAuth.ts                # sesión actual + suscripción a cambios
   components/
-    Login.tsx                  # magic link
+    Login.tsx                  # email + contraseña
     TaskInput.tsx
     TaskText.tsx                # linkifica URLs + resalta tags
     TaskItem.tsx
@@ -131,6 +177,7 @@ public/
   favicon.svg
 scripts/
   gen-icons.py                 # regenera public/icons/*.png (requiere Pillow)
+  set-password.mjs             # setea la contraseña vía Admin API (sin email)
 supabase/
   schema.sql                  # tabla tasks + políticas RLS
 vite.config.ts                # VitePWA: manifest + workbox + share_target
@@ -140,29 +187,29 @@ vite.config.ts                # VitePWA: manifest + workbox + share_target
 ## Roadmap
 
 1. ✅ Prototipo local con estado en memoria y parser todo.txt.
-2. ✅ Supabase conectado: tabla `tasks` + auth con magic link (único
-   usuario), RLS por `user_id`. Verificado end-to-end: login con
-   magic link + tarea creada y persistida (proyecto `dirkbtumgmxmacrrgzwd`).
+2. ✅ Supabase conectado: tabla `tasks` + auth, RLS por `user_id`.
 3. ✅ PWA instalable (`vite-plugin-pwa`, manifest + service worker con
-   precache del shell) + Share Target (`/share-target`). Instalación
-   "Agregar a inicio" y offline del shell probables ya en localhost
-   (dev server con `devOptions.enabled: true`); el share sheet real
-   de Android **solo aparece con la PWA instalada desde un origen
-   HTTPS** (localhost del PC no cuenta desde el celular) — probar
-   share target de punta a punta queda pendiente hasta el paso 4.
-4. ✅ Deploy en Vercel + instrucciones de publicación para el usuario.
+   precache del shell) + Share Target (`/share-target`), probado en
+   Android real.
+4. ✅ Deploy en Vercel + accesos rápidos: atajo de teclado en PC
+   (`Ctrl+Alt+T` sobre el `.lnk` de la PWA instalada) y bookmarklet
+   de Edge para compartir links desde escritorio.
+
+Queda pendiente (no bloqueante): acceso rápido tipo accesibilidad
+desde el Samsung S23 Ultra (ver más abajo).
 
 ## Ideas "nice to have" (no urgentes, anotadas para después)
 
-- Acceso rápido a la app con atajo de teclado global en PC (a nivel
-  SO, no solo dentro de la página — algo tipo lanzar/foco de la PWA
-  instalada con una combinación de teclas).
 - Acceso rápido desde el celular (Samsung S23 Ultra) con algún atajo
   al estilo accesos de accesibilidad de Android (ej. gesto o botón
-  asignable que abra la PWA directo). Pendiente de investigar cómo se
-  implementa (Android no da un "atajo global" trivial para abrir una
-  PWA salvo vía ícono/widget/Accessibility Shortcut/Edge panel según
-  el launcher) — se revisa más a fondo cuando lleguemos a esa etapa.
+  asignable que abra la PWA directo, sin pasar por el share sheet).
+  Pendiente de investigar cómo se implementa (Android no da un
+  "atajo global" trivial para abrir una PWA salvo vía ícono/widget/
+  Accessibility Shortcut/Edge panel según el launcher).
+- SMTP propio (Gmail o Resend) si en algún momento se quiere volver a
+  magic link u otros emails transaccionales sin el rate limit del
+  servicio compartido de Supabase — no urgente ahora que el login es
+  por contraseña.
 
 ## Decisiones / notas para retomar
 
@@ -189,7 +236,9 @@ vite.config.ts                # VitePWA: manifest + workbox + share_target
   también en `npm run dev` para poder probar instalación/offline
   antes de deployar — si algún día molesta durante desarrollo (cache
   viejo pegado), se puede desactivar o hacer "Unregister" del SW
-  desde DevTools → Application.
+  desde DevTools → Application. Ojo al testear cambios: el SW
+  cachea el shell, así que una ventana de PWA ya abierta puede mostrar
+  la versión vieja hasta cerrarla y reabrirla (o `Ctrl+Shift+R`).
 - Los íconos son generados por `scripts/gen-icons.py` (Pillow), no
   son archivos de diseño a mano — un cuadrado azul (`--accent`) con
   un check blanco. Si se quiere un logo real más adelante, reemplazar
