@@ -8,9 +8,31 @@ todo.txt, pensada para vivir 24/7 en Android y PC con hosting gratis.
 - Vite + React + TypeScript, sin librerías de estado ni UI kit.
 - CSS plano (`src/App.css`), tema oscuro por defecto.
 - Datos: Supabase (Postgres + auth por magic link, RLS por `user_id`).
-- Deploy futuro: Cloudflare Pages o Vercel (free tier).
+- Deploy: Cloudflare Pages o Vercel (free tier).
 
-## Estado actual: Paso 3 completo — PWA instalable + Share Target
+## Estado actual: Paso 4 completo — deployado
+
+**URL de producción: https://mario-to-do.vercel.app**
+
+- Repo: https://github.com/mamricca/marioToDo (rama `main`).
+- Deploy: Vercel, importado desde GitHub — cada `git push` a `main`
+  dispara un deploy automático. Vite se detecta solo (build
+  `vite build`, output `dist`).
+- Variables de entorno cargadas en Vercel (Project Settings →
+  Environment Variables): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+- `vercel.json` tiene un rewrite catch-all a `/index.html` — necesario
+  para que rutas como `/share-target` (que no existen como archivo)
+  las resuelva el router del lado del cliente en vez de tirar 404.
+- Verificado en producción (HTTPS real): manifest, service worker,
+  íconos y `/share-target` responden bien; login por magic link
+  probado end-to-end contra el dominio de Vercel (para esto hubo que
+  agregar `https://mario-to-do.vercel.app` a Redirect URLs / Site URL
+  en Supabase → Authentication → URL Configuration).
+- Pendiente de confirmar por el usuario: instalar la PWA en el
+  Samsung S23 Ultra y probar que "Todos" aparezca en el share sheet
+  de Android al compartir un link desde Chrome.
+
+## Estado anterior: Paso 3 — PWA instalable + Share Target
 
 Requiere un proyecto de Supabase propio (ver "Cómo correrlo" abajo).
 Ya no hay estado en memoria: todo se lee/escribe contra Postgres.
@@ -128,8 +150,7 @@ vite.config.ts                # VitePWA: manifest + workbox + share_target
    de Android **solo aparece con la PWA instalada desde un origen
    HTTPS** (localhost del PC no cuenta desde el celular) — probar
    share target de punta a punta queda pendiente hasta el paso 4.
-4. ⬜ Deploy en Cloudflare Pages o Vercel + instrucciones de
-   publicación para el usuario.
+4. ✅ Deploy en Vercel + instrucciones de publicación para el usuario.
 
 ## Ideas "nice to have" (no urgentes, anotadas para después)
 
