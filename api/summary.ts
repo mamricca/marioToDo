@@ -88,14 +88,15 @@ Tareas activas:
 ${taskList}
 
 Instrucciones:
-- 1 a 2 frases. Priorizá lo vencido y las tareas de prioridad (A), pero NO te limites a eso: casi siempre conviene sumar algo de panorama general (un proyecto que se está acumulando, una combinación de dos o tres tareas relacionadas contadas como una sola idea, un patrón que notás) en vez de listar nomás lo más urgente. Mezclá y conectá tareas distintas si tiene sentido, no las trates como ítems sueltos.
-- Cada tarea con [fecha: ...] puede ser un plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál. Para plazos usá "vence"/"hay que"; para eventos usá "es"/"sucede". Nunca digas que un evento "vence".
-- Formato de respuesta EXACTO: dos partes separadas por "|||". Se muestran una al lado de la otra con UN SOLO espacio entre ellas — nosotros no agregamos ninguna puntuación, así que la puntuación de unión (coma, punto y espacio, nada) la ponés vos al final de la primera parte o al principio de la segunda, la que use. La segunda parte es lo que más vale remarcar (se resalta en rojo) — no tiene que ser siempre lo más urgente. Si no hay nada para remarcar aparte, devolvé solo la primera parte, sin "|||".
-- Ejemplos (fijate que la puntuación de unión ya viene incluida en el texto, para que la concatenación con un espacio quede natural):
-  - "Tres pendientes," + " " + "una vencida desde ayer." → tenés que devolver "Tres pendientes,|||una vencida desde ayer."
-  - "Nada urgente hoy." + " " + "Igual +trabajo se está acumulando con tres tareas sueltas." → "Nada urgente hoy.|||Igual +trabajo se está acumulando con tres tareas sueltas."
-  - "Cinco pendientes," + " " + "y la despedida de Lelo es mañana." → "Cinco pendientes,|||y la despedida de Lelo es mañana."
-  - Sin nada para remarcar: "Todo tranquilo por ahora." (sin "|||")
+- El resumen tiene que ser sobre las tareas mismas — 1 a 2 frases que cuenten qué hay para hacer. NO agregues una segunda frase de relleno/comentario tipo "todo tranquilo", "nada para preocuparse", "todo en marcha" salvo que la lista esté genuinamente vacía. Si ya contaste las tareas relevantes, ahí termina — no le sumes una coda tranquilizadora sin información nueva.
+- Parafraseá, no copies el texto de la tarea tal cual — inferí de qué se trata y contalo con tus palabras, como lo diría una persona, no como una transcripción. Ejemplo: una tarea que dice literalmente "levantar las recetas de medicamentos" se puede contar como "pasar por la farmacia" o "buscar los remedios" — no repitas "recetas de medicamentos" textual.
+- Priorizá lo vencido y las tareas de prioridad (A), pero no te limites a eso: sumá panorama general cuando aporte (un proyecto que se acumula, dos o tres tareas relacionadas contadas como una sola idea). Mezclá y conectá tareas distintas si tiene sentido, no las trates como ítems sueltos de una lista.
+- Cada tarea con [fecha: ...] puede ser un plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál. Para plazos usá "vence"/"hay que"; para eventos usá "es"/"sucede", con una construcción natural (no siempre "mañana la despedida de X" — variá: "X se despide mañana", "mañana es la despedida de X", etc.). Nunca digas que un evento "vence".
+- Formato de respuesta EXACTO: dos partes separadas por "|||". Se muestran una al lado de la otra con UN SOLO espacio entre ellas — nosotros no agregamos ninguna puntuación, así que la puntuación de unión (coma, punto y espacio, nada) la ponés vos al final de la primera parte o al principio de la segunda, la que use. La segunda parte es otro dato concreto de las tareas (no un comentario) que vale la pena remarcar (se resalta en rojo). Si con una sola frase ya está completo, devolvé solo esa parte, sin "|||" — no inventes una segunda parte solo por rellenar.
+- Ejemplos (fijate que la puntuación de unión ya viene incluida en el texto, para que la concatenación con un espacio quede natural, y que la segunda parte siempre es información, nunca una muletilla):
+  - "Tres pendientes," + " " + "una vencida desde ayer." → "Tres pendientes,|||una vencida desde ayer."
+  - "Dos cosas para mañana:" + " " + "la despedida de Lelo y pasar por la farmacia." → "Dos cosas para mañana:|||la despedida de Lelo y pasar por la farmacia."
+  - Una sola tarea, alcanza con una frase: "Solo tenés que pasar por la farmacia hoy." (sin "|||")
 - Si no hay tareas activas, algo breve y con onda tipo "Todo al día." o "Lista vacía, disfrutalo."
 - Devolvé SOLO el texto del resumen. Sin comillas, sin explicaciones, sin markdown.`;
 }
