@@ -7,6 +7,7 @@ interface TaskListProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, newRaw: string) => void;
+  onAddSubtask?: (task: Task) => void;
   emptyMessage?: string;
 }
 
@@ -22,6 +23,7 @@ export function TaskList({
   onToggle,
   onDelete,
   onEdit,
+  onAddSubtask,
   emptyMessage,
 }: TaskListProps) {
   if (tasks.length === 0) {
@@ -38,6 +40,7 @@ export function TaskList({
           onToggle={onToggle}
           onDelete={onDelete}
           onEdit={onEdit}
+          onAddSubtask={onAddSubtask}
         />
       ))}
     </div>

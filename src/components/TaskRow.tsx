@@ -16,6 +16,7 @@ interface TaskRowProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, newRaw: string) => void;
+  onAddSubtask?: (task: Task) => void;
   /** True when rendering a sub-task inside its parent's row — suppresses
    * further nesting (one level of sub-tasks only). */
   nested?: boolean;
@@ -56,6 +57,7 @@ export function TaskRow({
   onToggle,
   onDelete,
   onEdit,
+  onAddSubtask,
   nested = false,
 }: TaskRowProps) {
   const [editing, setEditing] = useState(false);
@@ -217,6 +219,11 @@ export function TaskRow({
         </div>
 
         <div className="actions">
+          {!nested && onAddSubtask && (
+            <button type="button" onClick={() => onAddSubtask(task)}>
+              + sub
+            </button>
+          )}
           <button type="button" onClick={() => setEditing(true)}>
             editar
           </button>

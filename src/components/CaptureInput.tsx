@@ -8,6 +8,9 @@ interface CaptureInputProps {
   initialValue?: string | null;
   knownProjects: string[];
   knownContexts: string[];
+  /** When set, shows "sub-tarea de: {label}" and Esc cancels it (see TaskApp). */
+  subtaskTargetLabel?: string | null;
+  onClearSubtaskTarget?: () => void;
 }
 
 interface CurrentToken {
@@ -37,7 +40,15 @@ const TOKEN_CLASS: Record<string, string | undefined> = {
 
 export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
   function CaptureInput(
-    { onSubmit, placeholder, initialValue, knownProjects, knownContexts },
+    {
+      onSubmit,
+      placeholder,
+      initialValue,
+      knownProjects,
+      knownContexts,
+      subtaskTargetLabel,
+      onClearSubtaskTarget,
+    },
     ref
   ) {
     const [value, setValue] = useState(initialValue ?? "");
@@ -127,9 +138,14 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
       if (e.key === "Enter") {
         submit();
       } else if (e.key === "Escape") {
-        setValue("");
-        setToken(null);
-        (e.target as HTMLInputElement).blur();
+        if (subtaskTargetLabel && onClearSubtaskTarget) {
+          onClearSubtaskTarget();
+          setValue("");
+        } else {
+          setValue("");
+          setToken(null);
+          (e.target as HTMLInputElement).blur();
+        }
       }
     };
 
@@ -143,6 +159,14 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
 
     return (
       <div className="capture-wrap">
+        {subtaskTargetLabel && (
+          <div className="subtask-target">
+            sub-tarea de: <strong>{subtaskTargetLabel}</strong>
+            <button type="button" onClick={onClearSubtaskTarget} aria-label="Cancelar">
+              ✕
+            </button>
+          </div>
+        )}
         <div className="capture-shell">
           <div className="capture-backdrop" ref={backdropRef} aria-hidden="true">
             {tokens.map((t, i) => (
@@ -191,7 +215,8 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
         <p className="capture-hint">
           <kbd>/</kbd> para escribir · (A) texto +proyecto @contexto https://url
           el sábado / 4 de julio / 15/8 / en 3 días · $monto · empezá con{" "}
-          {'>'} para sumar una sub-tarea a la última tarea
+          {'>'} para sumar una sub-tarea a la última tarea, o "+ sub" en
+          cualquier tarea para elegir otra
         </p>
       </div>
     );

@@ -43,6 +43,11 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   const [pendingDelete, setPendingDelete] = useState<Task[] | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  // Explicitly chosen via the "+ sub" button on a task row — lets you add a
+  // sub-task to ANY task, not just the most recently touched one. Takes
+  // priority over the ">" prefix while active; stays active across several
+  // submits so you can add more than one, until cleared.
+  const [subtaskTargetId, setSubtaskTargetId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingDeleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Which top-level task the next "> sub-task" line should attach to.
@@ -110,6 +115,31 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
 
   const addTask = async (raw: string) => {
     const trimmed = raw.trim();
+
+    // Explicit "+ sub" target takes priority over the ">" convention below —
+    // this is how you attach a sub-task to something other than the most
+    // recently touched task.
+    if (subtaskTargetId) {
+      const target = tasks.find(
+        (t) => t.id === subtaskTargetId && !t.done && !t.parentId
+      );
+      if (!target) {
+        // Target got archived/deleted while picking — drop out of the mode
+        // instead of silently attaching to nothing.
+        setSubtaskTargetId(null);
+      } else {
+        const subRaw = trimmed.replace(/^>\s*/, "");
+        if (!subRaw) return;
+        const parsed = parseLine(subRaw);
+        try {
+          const task = await insertTask(subRaw, parsed, userId, target.id);
+          setTasks((prev) => [...prev, task]);
+        } catch (err) {
+          setErrorMessage(getErrorMessage(err));
+        }
+        return;
+      }
+    }
 
     // "> algo" — a sub-task of the most recently touched top-level task.
     if (trimmed.startsWith(">")) {
@@ -215,6 +245,11 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     setPendingDelete(null);
   };
 
+  const handleAddSubtaskClick = (task: Task) => {
+    setSubtaskTargetId(task.id);
+    inputRef.current?.focus();
+  };
+
   const { projects, contexts } = useMemo(() => {
     const projectSet = new Set<string>();
     const contextSet = new Set<string>();
@@ -264,6 +299,16 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   const completedThisWeek = archivedTasks.filter(
     (t) => t.completedAt && Date.now() - t.completedAt < WEEK_MS
   ).length;
+
+  const subtaskTarget = subtaskTargetId
+    ? tasks.find((t) => t.id === subtaskTargetId && !t.done && !t.parentId)
+    : undefined;
+  const subtaskTargetLabel = subtaskTarget
+    ? (() => {
+        const clean = stripTags(subtaskTarget.text) || subtaskTarget.text;
+        return clean.length > 40 ? `${clean.slice(0, 40)}…` : clean;
+      })()
+    : null;
 
   // The AI writes its own punctuation at the lead/accent boundary (comma
   // continuation or a full new sentence) — glued with a bare space. The
@@ -316,6 +361,8 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
         initialValue={initialDraft}
         knownProjects={projects}
         knownContexts={contexts}
+        subtaskTargetLabel={subtaskTargetLabel}
+        onClearSubtaskTarget={() => setSubtaskTargetId(null)}
       />
 
       {errorMessage && (
@@ -348,6 +395,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
           onToggle={toggleTask}
           onDelete={deleteTask}
           onEdit={editTask}
+          onAddSubtask={handleAddSubtaskClick}
           emptyMessage={
             view === "active"
               ? "No hay tareas pendientes en esta vista."
