@@ -77,10 +77,23 @@ push dispara un deploy automático en Vercel).
   texto (`task-meta`), no inline en la oración. El `raw`/`text`
   completo se preserva igual para poder editar sin perder nada.
 - **Filtros por tabs + chips** (`src/components/Filters.tsx`):
-  "Activas" / "Archivadas" son mutuamente excluyentes (reemplazan el
-  viejo modelo de "Todas" + toggle); los chips de `+proyecto`/
-  `@contexto` filtran dentro de la vista actual y muestran un
-  contador en vivo.
+  "Activas" / "Links" / "Archivadas" son mutuamente excluyentes; los
+  chips de `+proyecto`/`@contexto` filtran dentro de la vista actual
+  (no aparecen en "Links", esas tareas por definición no tienen tags)
+  y muestran un contador en vivo.
+- **Tab "Links"** (`src/sort.ts`, función `isLinkOnly`): una tarea sin
+  prioridad, sin `+proyecto`, sin `@contexto` pero con al menos un
+  link se considera "solo un link guardado" y se muestra en su propia
+  pestaña en vez de mezclarse con las tareas accionables de
+  "Activas". Basta con agregar cualquier prioridad/tag para que vuelva
+  a aparecer como tarea normal. El conteo de "pendientes" del masthead
+  y el colofón usan las tareas de "Activas" (sin los links sueltos).
+- **Orden configurable** (`src/sort.ts`, función `sortTasks`): además
+  de los filtros, un control aparte ("ordenar: prioridad · fecha")
+  cambia el criterio de orden de la lista que se esté viendo.
+  Prioridad (default) = A→Z, sin prioridad al final. Fecha = por
+  `due_date` ascendente, sin fecha al final. En ambos casos el
+  desempate es por fecha de creación.
 - **Completar** (checkbox circular) archiva la tarea con una
   transición de fade-out de ~220ms antes de moverla — no se pierde,
   queda en "Archivadas".
@@ -118,8 +131,9 @@ push dispara un deploy automático en Vercel).
 src/
   types.ts                  # Task, View, TagFilter
   format.ts                  # texto en español: conteos, kicker, colofón, fecha
-  parser.ts                   # parseLine, stripTags, extractDueDate,
-                                # tokenizeForHighlight
+  sort.ts                     # sortTasks (prioridad/fecha), isLinkOnly
+  parser.ts                    # parseLine, stripTags, extractDueDate,
+                                 # tokenizeForHighlight
   shareTarget.ts               # consumeShareTarget (lee /share-target?...)
   lib/
     supabaseClient.ts          # cliente supabase-js, lee VITE_SUPABASE_*
@@ -130,8 +144,8 @@ src/
     Login.tsx                     # email + contraseña
     CaptureInput.tsx                # input con resaltado en vivo + autocompletado
     TaskRow.tsx                      # fila: check, pri-mark, body, meta, actions
-    TaskList.tsx                      # ordena por prioridad
-    Filters.tsx                       # tabs Activas/Archivadas + chips
+    TaskList.tsx                      # solo renderiza; el orden lo decide TaskApp
+    Filters.tsx                       # tabs Activas/Links/Archivadas + chips + orden
     Toast.tsx                          # deshacer borrado
   App.tsx                    # auth gate: Login o TaskApp
   TaskApp.tsx                 # la app en sí: estado, wiring, masthead/colofón

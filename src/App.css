@@ -288,8 +288,9 @@ input {
   color: var(--ink);
 }
 
-.chip .count {
+.count {
   color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .chip.proy {
@@ -302,6 +303,41 @@ input {
 
 .chip.active {
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.sort-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sort-btn {
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0;
+}
+
+.sort-btn:hover {
+  color: var(--ink-dim);
+}
+
+.sort-btn.active {
+  color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

@@ -5,6 +5,7 @@ import { Filters } from "./components/Filters";
 import { Toast } from "./components/Toast";
 import { parseLine } from "./parser";
 import { colophonText, formatKicker, countPhrase, priorityClause } from "./format";
+import { sortTasks, isLinkOnly, type SortMode } from "./sort";
 import {
   fetchTasks,
   insertTask,
@@ -30,6 +31,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [view, setView] = useState<View>("active");
   const [tagFilter, setTagFilter] = useState<TagFilter | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingDeleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,16 +152,23 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     };
   }, [tasks]);
 
-  const activeTasks = tasks.filter((t) => !t.done);
+  const nonArchived = tasks.filter((t) => !t.done);
   const archivedTasks = tasks.filter((t) => t.done);
-  const viewTasks = view === "active" ? activeTasks : archivedTasks;
+  const linkTasks = nonArchived.filter(isLinkOnly);
+  const activeTasks = nonArchived.filter((t) => !isLinkOnly(t));
 
-  const displayedTasks = viewTasks.filter((t) => {
-    if (!tagFilter) return true;
-    return tagFilter.type === "project"
-      ? t.projects.includes(tagFilter.value)
-      : t.contexts.includes(tagFilter.value);
-  });
+  const viewTasks =
+    view === "active" ? activeTasks : view === "links" ? linkTasks : archivedTasks;
+
+  const displayedTasks = sortTasks(
+    viewTasks.filter((t) => {
+      if (view === "links" || !tagFilter) return true;
+      return tagFilter.type === "project"
+        ? t.projects.includes(tagFilter.value)
+        : t.contexts.includes(tagFilter.value);
+    }),
+    sortMode
+  );
 
   const priorityCount = activeTasks.filter((t) => t.priority).length;
   const completedThisWeek = archivedTasks.filter(
@@ -207,6 +216,9 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
         viewTasks={viewTasks}
         tagFilter={tagFilter}
         onTagFilterChange={setTagFilter}
+        linksCount={linkTasks.length}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
       />
 
       {loading ? (
@@ -222,6 +234,8 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
           emptyMessage={
             view === "active"
               ? "No hay tareas pendientes en esta vista."
+              : view === "links"
+              ? "Todavía no guardaste ningún link suelto."
               : "Todavía no archivaste ninguna tarea."
           }
         />

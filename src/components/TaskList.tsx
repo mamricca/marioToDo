@@ -9,17 +9,7 @@ interface TaskListProps {
   emptyMessage?: string;
 }
 
-function sortTasks(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => {
-    if (a.priority !== b.priority) {
-      if (!a.priority) return 1;
-      if (!b.priority) return -1;
-      return a.priority.localeCompare(b.priority);
-    }
-    return a.createdAt - b.createdAt;
-  });
-}
-
+/** Renders tasks in the order given — sorting is the caller's job (see sort.ts). */
 export function TaskList({
   tasks,
   onToggle,
@@ -33,7 +23,7 @@ export function TaskList({
 
   return (
     <div className="tasks">
-      {sortTasks(tasks).map((task) => (
+      {tasks.map((task) => (
         <TaskRow
           key={task.id}
           task={task}

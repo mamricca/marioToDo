@@ -15,8 +15,8 @@ export interface Task {
   completedAt: number | null;
 }
 
-/** Which of the two mutually-exclusive tabs is showing. */
-export type View = "active" | "archived";
+/** Which of the mutually-exclusive tabs is showing. */
+export type View = "active" | "links" | "archived";
 
 /** Optional tag chip filtering within the current view. */
 export interface TagFilter {
