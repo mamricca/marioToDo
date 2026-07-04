@@ -4,7 +4,13 @@ import { TaskList } from "./components/TaskList";
 import { Filters } from "./components/Filters";
 import { Toast } from "./components/Toast";
 import { parseLine } from "./parser";
-import { colophonText, formatKicker, countPhrase, priorityClause } from "./format";
+import {
+  colophonText,
+  formatKicker,
+  countPhrase,
+  priorityClause,
+  getErrorMessage,
+} from "./format";
 import { sortTasks, isLinkOnly, type SortMode } from "./sort";
 import {
   fetchTasks,
@@ -39,7 +45,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   useEffect(() => {
     fetchTasks()
       .then(setTasks)
-      .catch((err) => setErrorMessage(err.message))
+      .catch((err) => setErrorMessage(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -81,7 +87,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
       const task = await insertTask(raw, parsed, userId);
       setTasks((prev) => [...prev, task]);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(getErrorMessage(err));
     }
   };
 
@@ -92,7 +98,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
       const updated = await updateTaskDone(id, !current.done);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(getErrorMessage(err));
     }
   };
 
@@ -102,7 +108,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
       const updated = await updateTaskRaw(id, newRaw, parsed);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(getErrorMessage(err));
     }
   };
 
@@ -110,7 +116,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     try {
       await deleteTaskById(task.id);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setErrorMessage(getErrorMessage(err));
     }
   };
 

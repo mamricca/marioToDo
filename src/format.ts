@@ -1,3 +1,15 @@
+/**
+ * Supabase/PostgREST errors are plain objects with a `.message` field, not
+ * `Error` instances — `String(err)` on those gives "[object Object]".
+ */
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return String(err);
+}
+
 const NUMBERS_ES = [
   "cero",
   "uno",
