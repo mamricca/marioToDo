@@ -435,8 +435,17 @@ input {
   color: var(--ink-faint);
 }
 
-.task-body-wrap {
+.task-row-content {
+  display: flex;
   flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+  column-gap: 14px;
+  row-gap: 4px;
+}
+
+.task-body-wrap {
+  flex: 1 1 100px;
   min-width: 0;
 }
 

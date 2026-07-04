@@ -140,88 +140,90 @@ export function TaskRow({
         {task.priority ?? "·"}
       </div>
 
-      <div className="task-body-wrap">
-        {editing ? (
-          <input
-            className="edit-input"
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitEdit();
-              if (e.key === "Escape") {
-                setDraft(task.raw);
-                setEditing(false);
-              }
-            }}
-          />
-        ) : (
-          <div className="task-body" onDoubleClick={() => setEditing(true)}>
-            {renderBodyWithAmounts(bodyText)}
-            {subtasks.length > 0 && (
-              <span className="subtask-count">
-                {doneSubtasks}/{subtasks.length}
-              </span>
-            )}
-          </div>
-        )}
+      <div className="task-row-content">
+        <div className="task-body-wrap">
+          {editing ? (
+            <input
+              className="edit-input"
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") {
+                  setDraft(task.raw);
+                  setEditing(false);
+                }
+              }}
+            />
+          ) : (
+            <div className="task-body" onDoubleClick={() => setEditing(true)}>
+              {renderBodyWithAmounts(bodyText)}
+              {subtasks.length > 0 && (
+                <span className="subtask-count">
+                  {doneSubtasks}/{subtasks.length}
+                </span>
+              )}
+            </div>
+          )}
 
-        {!editing && hasMeta && (
-          <div className="task-meta">
-            {task.dueDate && (
-              <span className={`tk-due${overdue ? " overdue" : ""}`}>
-                {formatDueDate(task.dueDate)}
-              </span>
-            )}
-            {task.projects.map((p) => (
-              <span key={`p-${p}`} className="tk-proy">
-                +{p}
-              </span>
-            ))}
-            {task.contexts.map((c) => (
-              <span key={`c-${c}`} className="tk-ctx">
-                @{c}
-              </span>
-            ))}
-            {task.urls.map((u) => (
-              <a
-                key={u}
-                className="tk-link"
-                href={u}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {linkLabel(u)}
-              </a>
-            ))}
-          </div>
-        )}
+          {!editing && hasMeta && (
+            <div className="task-meta">
+              {task.dueDate && (
+                <span className={`tk-due${overdue ? " overdue" : ""}`}>
+                  {formatDueDate(task.dueDate)}
+                </span>
+              )}
+              {task.projects.map((p) => (
+                <span key={`p-${p}`} className="tk-proy">
+                  +{p}
+                </span>
+              ))}
+              {task.contexts.map((c) => (
+                <span key={`c-${c}`} className="tk-ctx">
+                  @{c}
+                </span>
+              ))}
+              {task.urls.map((u) => (
+                <a
+                  key={u}
+                  className="tk-link"
+                  href={u}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {linkLabel(u)}
+                </a>
+              ))}
+            </div>
+          )}
 
-        {!nested && subtasks.length > 0 && (
-          <div className="subtasks">
-            {subtasks.map((s) => (
-              <TaskRow
-                key={s.id}
-                task={s}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                nested
-              />
-            ))}
-          </div>
-        )}
-      </div>
+          {!nested && subtasks.length > 0 && (
+            <div className="subtasks">
+              {subtasks.map((s) => (
+                <TaskRow
+                  key={s.id}
+                  task={s}
+                  onToggle={onToggle}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  nested
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-      <div className="actions">
-        <button type="button" onClick={() => setEditing(true)}>
-          editar
-        </button>
-        <button type="button" onClick={() => onDelete(task.id)}>
-          borrar
-        </button>
+        <div className="actions">
+          <button type="button" onClick={() => setEditing(true)}>
+            editar
+          </button>
+          <button type="button" onClick={() => onDelete(task.id)}>
+            borrar
+          </button>
+        </div>
       </div>
     </div>
   );
