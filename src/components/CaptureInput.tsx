@@ -32,6 +32,7 @@ const TOKEN_CLASS: Record<string, string | undefined> = {
   context: "tk-ctx",
   url: "tk-link",
   date: "tk-due",
+  money: "tk-money",
 };
 
 export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
@@ -189,7 +190,8 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
         </div>
         <p className="capture-hint">
           <kbd>/</kbd> para escribir · (A) texto +proyecto @contexto https://url
-          el sábado / el próximo sábado / mañana
+          el sábado / mañana · $monto · empezá con {'>'} para sumar una
+          sub-tarea a la última tarea
         </p>
       </div>
     );

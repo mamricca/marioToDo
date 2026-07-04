@@ -11,6 +11,7 @@ interface TaskRow {
   contexts: string[];
   urls: string[];
   due_date: string | null;
+  parent_id: string | null;
   done: boolean;
   created_at: string;
   completed_at: string | null;
@@ -26,6 +27,7 @@ function rowToTask(row: TaskRow): Task {
     contexts: row.contexts,
     urls: row.urls,
     dueDate: row.due_date,
+    parentId: row.parent_id,
     done: row.done,
     createdAt: new Date(row.created_at).getTime(),
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
@@ -44,7 +46,8 @@ export async function fetchTasks(): Promise<Task[]> {
 export async function insertTask(
   raw: string,
   parsed: ParsedLine,
-  userId: string
+  userId: string,
+  parentId: string | null = null
 ): Promise<Task> {
   const { data, error } = await supabase
     .from("tasks")
@@ -57,6 +60,7 @@ export async function insertTask(
       contexts: parsed.contexts,
       urls: parsed.urls,
       due_date: parsed.dueDate,
+      parent_id: parentId,
     })
     .select()
     .single();

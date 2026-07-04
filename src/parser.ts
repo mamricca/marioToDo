@@ -126,10 +126,14 @@ export function stripTags(text: string): string {
 
 export type HighlightToken = {
   text: string;
-  type: "plain" | "priority" | "project" | "context" | "url" | "date";
+  type: "plain" | "priority" | "project" | "context" | "url" | "date" | "money";
 };
 
-const TOKEN_RE = /(https?:\/\/\S+)|(\+\S+)|(@\S+)/g;
+/** $45000, $45.000, $1,234.56 — must end on a digit so trailing punctuation
+ * ("Pagar $500.") isn't swallowed into the match. */
+export const MONEY_RE = /\$\d(?:[\d.,]*\d)?/g;
+
+const TOKEN_RE = /(https?:\/\/\S+)|(\+\S+)|(@\S+)|(\$\d(?:[\d.,]*\d)?)/g;
 
 function splitOutDate(token: HighlightToken): HighlightToken[] {
   if (token.type !== "plain") return [token];
@@ -168,10 +172,11 @@ export function tokenizeForHighlight(raw: string): HighlightToken[] {
     if (m.index > lastIndex) {
       tokens.push({ text: rest.slice(lastIndex, m.index), type: "plain" });
     }
-    const [full, url, project, context] = m;
+    const [full, url, project, context, money] = m;
     if (url) tokens.push({ text: full, type: "url" });
     else if (project) tokens.push({ text: full, type: "project" });
     else if (context) tokens.push({ text: full, type: "context" });
+    else if (money) tokens.push({ text: full, type: "money" });
     lastIndex = m.index + full.length;
   }
   if (lastIndex < rest.length) {

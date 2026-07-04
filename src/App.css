@@ -11,7 +11,7 @@
   --proyecto: #8ca377;
   --contexto: #a594d1;
   --link: #6fa2c9;
-  --due: #c9a869;
+  --money: #c9a869;
 
   --font-display: "Fraunces", serif;
   --font-ui: "Instrument Sans", sans-serif;
@@ -184,12 +184,16 @@ input {
 }
 
 .tk-due {
-  color: var(--due);
+  color: var(--ink-dim);
 }
 
 .tk-due.overdue {
   color: var(--accent);
   font-weight: 500;
+}
+
+.tk-money {
+  color: var(--money);
 }
 
 .capture-hint {
@@ -429,6 +433,38 @@ input {
 .task.completed .task-body {
   color: var(--ink-faint);
   text-decoration: line-through;
+}
+
+.subtask-count {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.subtasks {
+  margin-top: 10px;
+  padding-left: 14px;
+  border-left: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task.nested {
+  padding: 6px 0;
+  border-bottom: none;
+  font-size: 0.92em;
+}
+
+.task.nested .check {
+  width: 12px;
+  height: 12px;
+}
+
+.task.nested .task-body {
+  font-size: 14px;
 }
 
 .task-meta {

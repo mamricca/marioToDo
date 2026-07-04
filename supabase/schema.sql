@@ -10,12 +10,14 @@ create table if not exists public.tasks (
   contexts text[] not null default '{}',
   urls text[] not null default '{}',
   due_date date,
+  parent_id uuid references public.tasks (id) on delete cascade,
   done boolean not null default false,
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
 
 create index if not exists tasks_user_id_idx on public.tasks (user_id);
+create index if not exists tasks_parent_id_idx on public.tasks (parent_id);
 
 alter table public.tasks enable row level security;
 

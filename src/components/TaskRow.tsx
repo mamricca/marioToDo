@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Task } from "../types";
-import { stripTags } from "../parser";
+import { stripTags, MONEY_RE } from "../parser";
 import { formatDueDate, isOverdue } from "../format";
 
 const COMPLETE_TRANSITION_MS = 220;
 
 interface TaskRowProps {
   task: Task;
+  subtasks?: Task[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, newRaw: string) => void;
+  /** True when rendering a sub-task inside its parent's row — suppresses
+   * further nesting (one level of sub-tasks only). */
+  nested?: boolean;
 }
 
 function priorityModifier(priority: string | null): "a" | "b" | "none" {
@@ -21,7 +26,34 @@ function linkLabel(url: string): string {
   return url.replace(/^https?:\/\//, "");
 }
 
-export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
+/** Highlights $amounts inline, unlike tags/dates which are stripped out. */
+function renderBodyWithAmounts(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  MONEY_RE.lastIndex = 0;
+  while ((m = MONEY_RE.exec(text)) !== null) {
+    if (m.index > lastIndex) parts.push(text.slice(lastIndex, m.index));
+    parts.push(
+      <span key={key++} className="tk-money">
+        {m[0]}
+      </span>
+    );
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+export function TaskRow({
+  task,
+  subtasks = [],
+  onToggle,
+  onDelete,
+  onEdit,
+  nested = false,
+}: TaskRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.raw);
   const [completing, setCompleting] = useState(false);
@@ -61,12 +93,13 @@ export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
     task.urls.length > 0 ||
     Boolean(task.dueDate);
   const overdue = task.dueDate && !task.done && isOverdue(task.dueDate);
+  const doneSubtasks = subtasks.filter((s) => s.done).length;
 
   return (
     <div
       className={`task${task.done ? " completed" : ""}${
         completing ? " completing" : ""
-      }`}
+      }${nested ? " nested" : ""}`}
     >
       <button
         type="button"
@@ -99,7 +132,12 @@ export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
           />
         ) : (
           <div className="task-body" onDoubleClick={() => setEditing(true)}>
-            {bodyText}
+            {renderBodyWithAmounts(bodyText)}
+            {subtasks.length > 0 && (
+              <span className="subtask-count">
+                {doneSubtasks}/{subtasks.length}
+              </span>
+            )}
           </div>
         )}
 
@@ -131,6 +169,21 @@ export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
               >
                 {linkLabel(u)}
               </a>
+            ))}
+          </div>
+        )}
+
+        {!nested && subtasks.length > 0 && (
+          <div className="subtasks">
+            {subtasks.map((s) => (
+              <TaskRow
+                key={s.id}
+                task={s}
+                onToggle={onToggle}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                nested
+              />
             ))}
           </div>
         )}
