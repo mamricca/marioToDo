@@ -4,7 +4,11 @@ import type { Task } from "../types";
 import { stripTags, MONEY_RE } from "../parser";
 import { formatDueDate, isOverdue } from "../format";
 
-const COMPLETE_TRANSITION_MS = 220;
+// How long a newly-completed top-level task stays visibly checked/struck
+// through *in the current list* before it fades out and actually moves to
+// Archivadas — gives a moment to register "yes, done" before it vanishes.
+const SETTLE_MS = 900;
+const FADE_MS = 220;
 
 interface TaskRowProps {
   task: Task;
@@ -56,7 +60,11 @@ export function TaskRow({
 }: TaskRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.raw);
-  const [completing, setCompleting] = useState(false);
+  // justDone: shows checked/struck-through immediately, before the row
+  // actually leaves for another tab. fadingOut: the translateX/opacity
+  // transition right before it does leave.
+  const [justDone, setJustDone] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -79,18 +87,31 @@ export function TaskRow({
     // Nested rows never leave the view either way (they stay under their
     // parent regardless of done state) — toggle immediately and let the
     // CSS color/strikethrough transitions carry the "in place" change.
-    // Top-level rows move to a different tab either direction (Activas <->
-    // Archivadas), so fade out first, then actually toggle underneath it.
     if (nested) {
       onToggle(task.id);
       return;
     }
-    setCompleting(true);
-    timeoutRef.current = setTimeout(() => {
-      onToggle(task.id);
-    }, COMPLETE_TRANSITION_MS);
+
+    if (!task.done) {
+      // Completing: show checked + struck-through right away, in the
+      // current list, hold for a beat, then fade out and actually archive.
+      setJustDone(true);
+      timeoutRef.current = setTimeout(() => {
+        setFadingOut(true);
+        timeoutRef.current = setTimeout(() => {
+          onToggle(task.id);
+        }, FADE_MS);
+      }, SETTLE_MS);
+    } else {
+      // Un-completing: already showing as done, just fade out then move.
+      setFadingOut(true);
+      timeoutRef.current = setTimeout(() => {
+        onToggle(task.id);
+      }, FADE_MS);
+    }
   };
 
+  const isDone = task.done || justDone;
   const bodyText = stripTags(task.text) || task.text;
   const hasMeta =
     task.projects.length > 0 ||
@@ -102,16 +123,16 @@ export function TaskRow({
 
   return (
     <div
-      className={`task${task.done ? " completed" : ""}${
-        completing ? " completing" : ""
+      className={`task${isDone ? " completed" : ""}${
+        fadingOut ? " completing" : ""
       }${nested ? " nested" : ""}`}
     >
       <button
         type="button"
         role="checkbox"
-        aria-checked={task.done || completing}
+        aria-checked={isDone}
         aria-label={task.done ? "Marcar como pendiente" : "Marcar como completada"}
-        className={`check${task.done || completing ? " done" : ""}`}
+        className={`check${isDone ? " done" : ""}`}
         onClick={handleToggle}
       />
 
