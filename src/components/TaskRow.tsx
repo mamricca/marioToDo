@@ -76,17 +76,19 @@ export function TaskRow({
   };
 
   const handleToggle = () => {
-    if (!task.done) {
-      setCompleting(true);
-      timeoutRef.current = setTimeout(() => {
-        onToggle(task.id);
-        // Nested rows don't leave the view when completed (only top-level
-        // tasks move to another tab) — reset so it doesn't stay invisible.
-        if (nested) setCompleting(false);
-      }, COMPLETE_TRANSITION_MS);
-    } else {
+    // Nested rows never leave the view either way (they stay under their
+    // parent regardless of done state) — toggle immediately and let the
+    // CSS color/strikethrough transitions carry the "in place" change.
+    // Top-level rows move to a different tab either direction (Activas <->
+    // Archivadas), so fade out first, then actually toggle underneath it.
+    if (nested) {
       onToggle(task.id);
+      return;
     }
+    setCompleting(true);
+    timeoutRef.current = setTimeout(() => {
+      onToggle(task.id);
+    }, COMPLETE_TRANSITION_MS);
   };
 
   const bodyText = stripTags(task.text) || task.text;

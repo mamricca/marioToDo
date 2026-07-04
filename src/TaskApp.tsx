@@ -265,11 +265,15 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     (t) => t.completedAt && Date.now() - t.completedAt < WEEK_MS
   ).length;
 
-  const { lead, accent } = aiSummary
-    ? splitSummary(aiSummary)
+  // The AI writes its own punctuation at the lead/accent boundary (comma
+  // continuation or a full new sentence) — glued with a bare space. The
+  // local fallback is a fixed template, so it always needs the comma.
+  const { lead, accent, accentGlue } = aiSummary
+    ? { ...splitSummary(aiSummary), accentGlue: " " }
     : {
         lead: countPhrase(activeTasks.length, "pendiente", "pendientes", "m"),
         accent: priorityCount > 0 ? priorityClause(priorityCount) : null,
+        accentGlue: ", ",
       };
 
   return (
@@ -290,7 +294,12 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
         </div>
         <div className="headline">
           {lead}
-          {accent && <span className="accent">, {accent}</span>}
+          {accent && (
+            <span className="accent">
+              {accentGlue}
+              {accent}
+            </span>
+          )}
         </div>
       </div>
 

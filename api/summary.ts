@@ -82,17 +82,21 @@ function buildPrompt(tasks: SummaryTask[]): string {
   const taskList = lines.length > 0 ? lines.join("\n") : "(sin tareas activas)";
   const today = new Date().toISOString().slice(0, 10);
 
-  return `Sos un asistente que resume una lista de tareas pendientes en español, en tono directo y editorial, sin relleno. Hoy es ${today}.
+  return `Sos la voz de un titular editorial personal: alguien que conoce bien esta lista de tareas y la resume con criterio propio, no un bot que enumera. Tono directo, expresivo, con personalidad — no formulaico, no repitas siempre la misma estructura de una llamada a la otra. Hoy es ${today}.
 
 Tareas activas:
 ${taskList}
 
 Instrucciones:
-- Resumen de 1 a 2 frases. Priorizá lo vencido y las tareas de prioridad (A), pero no te limites solo a eso: si no hay nada urgente, o incluso si lo hay, aprovechá para dar un panorama más general (algo que se está acumulando, un proyecto con varias tareas, etc.) en vez de enfocarte SIEMPRE únicamente en lo más urgente.
-- Cada tarea con [fecha: ...] puede ser una tarea con plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál y elegí el verbo acorde: para plazos usá "vence"/"hay que" ("Levantar recetas vence mañana"); para eventos usá "es"/"sucede" ("La despedida de Lelo es mañana"). Nunca digas que un evento "vence".
-- Formato de respuesta EXACTO: dos partes separadas por "|||". La primera parte es neutra (ej. cantidad de pendientes). La segunda parte es la frase que más vale la pena remarcar (se resalta en rojo en la interfaz) — no tiene que ser siempre lo más urgente, puede ser cualquier dato relevante del panorama general. Si no hay nada para remarcar, devolvé solo la primera parte sin "|||".
-- Ejemplos de tono y formato: "Tres pendientes|||una vencida desde ayer" — "Nada urgente|||pero +trabajo se está acumulando" — "Cinco pendientes|||la despedida de Lelo es mañana" — "Todo al día"
-- Si no hay tareas activas, devolvé algo breve tipo "Todo al día".
+- 1 a 2 frases. Priorizá lo vencido y las tareas de prioridad (A), pero NO te limites a eso: casi siempre conviene sumar algo de panorama general (un proyecto que se está acumulando, una combinación de dos o tres tareas relacionadas contadas como una sola idea, un patrón que notás) en vez de listar nomás lo más urgente. Mezclá y conectá tareas distintas si tiene sentido, no las trates como ítems sueltos.
+- Cada tarea con [fecha: ...] puede ser un plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál. Para plazos usá "vence"/"hay que"; para eventos usá "es"/"sucede". Nunca digas que un evento "vence".
+- Formato de respuesta EXACTO: dos partes separadas por "|||". Se muestran una al lado de la otra con UN SOLO espacio entre ellas — nosotros no agregamos ninguna puntuación, así que la puntuación de unión (coma, punto y espacio, nada) la ponés vos al final de la primera parte o al principio de la segunda, la que use. La segunda parte es lo que más vale remarcar (se resalta en rojo) — no tiene que ser siempre lo más urgente. Si no hay nada para remarcar aparte, devolvé solo la primera parte, sin "|||".
+- Ejemplos (fijate que la puntuación de unión ya viene incluida en el texto, para que la concatenación con un espacio quede natural):
+  - "Tres pendientes," + " " + "una vencida desde ayer." → tenés que devolver "Tres pendientes,|||una vencida desde ayer."
+  - "Nada urgente hoy." + " " + "Igual +trabajo se está acumulando con tres tareas sueltas." → "Nada urgente hoy.|||Igual +trabajo se está acumulando con tres tareas sueltas."
+  - "Cinco pendientes," + " " + "y la despedida de Lelo es mañana." → "Cinco pendientes,|||y la despedida de Lelo es mañana."
+  - Sin nada para remarcar: "Todo tranquilo por ahora." (sin "|||")
+- Si no hay tareas activas, algo breve y con onda tipo "Todo al día." o "Lista vacía, disfrutalo."
 - Devolvé SOLO el texto del resumen. Sin comillas, sin explicaciones, sin markdown.`;
 }
 
@@ -106,7 +110,7 @@ async function callGemini(prompt: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 80 },
+      generationConfig: { temperature: 0.85, maxOutputTokens: 120 },
     }),
   });
 
