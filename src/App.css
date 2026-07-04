@@ -476,7 +476,7 @@ input {
 
 .subtasks {
   margin-top: 10px;
-  padding-left: 14px;
+  padding-left: 12px;
   border-left: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
@@ -487,11 +487,22 @@ input {
   padding: 6px 0;
   border-bottom: none;
   font-size: 0.92em;
+  gap: 10px;
 }
 
 .task.nested .check {
   width: 12px;
   height: 12px;
+}
+
+@media (max-width: 480px) {
+  .subtasks {
+    padding-left: 8px;
+  }
+
+  .task.nested {
+    gap: 8px;
+  }
 }
 
 .task.nested .task-body {
@@ -517,6 +528,8 @@ input {
 
 .actions {
   display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   gap: 14px;
   align-self: flex-start;
   font-family: var(--font-mono);
