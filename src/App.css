@@ -11,6 +11,7 @@
   --proyecto: #8ca377;
   --contexto: #a594d1;
   --link: #6fa2c9;
+  --due: #c9a869;
 
   --font-display: "Fraunces", serif;
   --font-ui: "Instrument Sans", sans-serif;
@@ -180,6 +181,15 @@ input {
   color: var(--link);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.tk-due {
+  color: var(--due);
+}
+
+.tk-due.overdue {
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .capture-hint {

@@ -9,6 +9,7 @@ create table if not exists public.tasks (
   projects text[] not null default '{}',
   contexts text[] not null default '{}',
   urls text[] not null default '{}',
+  due_date date,
   done boolean not null default false,
   created_at timestamptz not null default now(),
   completed_at timestamptz

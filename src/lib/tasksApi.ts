@@ -10,6 +10,7 @@ interface TaskRow {
   projects: string[];
   contexts: string[];
   urls: string[];
+  due_date: string | null;
   done: boolean;
   created_at: string;
   completed_at: string | null;
@@ -24,6 +25,7 @@ function rowToTask(row: TaskRow): Task {
     projects: row.projects,
     contexts: row.contexts,
     urls: row.urls,
+    dueDate: row.due_date,
     done: row.done,
     createdAt: new Date(row.created_at).getTime(),
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
@@ -54,6 +56,7 @@ export async function insertTask(
       projects: parsed.projects,
       contexts: parsed.contexts,
       urls: parsed.urls,
+      due_date: parsed.dueDate,
     })
     .select()
     .single();
@@ -75,6 +78,7 @@ export async function updateTaskRaw(
       projects: parsed.projects,
       contexts: parsed.contexts,
       urls: parsed.urls,
+      due_date: parsed.dueDate,
     })
     .eq("id", id)
     .select()

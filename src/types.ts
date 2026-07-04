@@ -8,6 +8,8 @@ export interface Task {
   projects: string[];
   contexts: string[];
   urls: string[];
+  /** ISO date (YYYY-MM-DD), resolved from a relative-date phrase like "el sábado". */
+  dueDate: string | null;
   done: boolean;
   createdAt: number;
   completedAt: number | null;

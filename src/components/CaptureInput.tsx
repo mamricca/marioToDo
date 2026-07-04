@@ -31,6 +31,7 @@ const TOKEN_CLASS: Record<string, string | undefined> = {
   project: "tk-proy",
   context: "tk-ctx",
   url: "tk-link",
+  date: "tk-due",
 };
 
 export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
@@ -162,7 +163,7 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
             onBlur={() => setToken(null)}
             placeholder={
               placeholder ??
-              "(A) Terminar informe +trabajo @compu https://ejemplo.com"
+              "(A) Terminar informe +trabajo @compu el sábado https://ejemplo.com"
             }
             autoComplete="off"
             spellCheck={false}
@@ -188,6 +189,7 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
         </div>
         <p className="capture-hint">
           <kbd>/</kbd> para escribir · (A) texto +proyecto @contexto https://url
+          el sábado / el próximo sábado / mañana
         </p>
       </div>
     );

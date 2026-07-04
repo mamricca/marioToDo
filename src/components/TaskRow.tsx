@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Task } from "../types";
 import { stripTags } from "../parser";
+import { formatDueDate, isOverdue } from "../format";
 
 const COMPLETE_TRANSITION_MS = 220;
 
@@ -55,7 +56,11 @@ export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
 
   const bodyText = stripTags(task.text) || task.text;
   const hasMeta =
-    task.projects.length > 0 || task.contexts.length > 0 || task.urls.length > 0;
+    task.projects.length > 0 ||
+    task.contexts.length > 0 ||
+    task.urls.length > 0 ||
+    Boolean(task.dueDate);
+  const overdue = task.dueDate && !task.done && isOverdue(task.dueDate);
 
   return (
     <div
@@ -100,6 +105,11 @@ export function TaskRow({ task, onToggle, onDelete, onEdit }: TaskRowProps) {
 
         {!editing && hasMeta && (
           <div className="task-meta">
+            {task.dueDate && (
+              <span className={`tk-due${overdue ? " overdue" : ""}`}>
+                {formatDueDate(task.dueDate)}
+              </span>
+            )}
             {task.projects.map((p) => (
               <span key={`p-${p}`} className="tk-proy">
                 +{p}

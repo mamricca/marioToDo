@@ -58,3 +58,22 @@ export function formatKicker(date: Date): string {
   const month = date.toLocaleDateString("es-AR", { month: "long" });
   return `${weekday} · ${day} de ${month}`;
 }
+
+function parseIsoDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** "sáb 4 jul" style short label for a due-date badge. */
+export function formatDueDate(iso: string): string {
+  const date = parseIsoDate(iso);
+  const weekday = date.toLocaleDateString("es-AR", { weekday: "short" }).replace(/\.$/, "");
+  const month = date.toLocaleDateString("es-AR", { month: "short" }).replace(/\.$/, "");
+  return `${weekday} ${date.getDate()} ${month}`;
+}
+
+export function isOverdue(iso: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return parseIsoDate(iso).getTime() < today.getTime();
+}

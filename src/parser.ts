@@ -3,22 +3,95 @@ const URL_RE = /https?:\/\/[^\s]+/g;
 const PROJECT_RE = /\+(\S+)/g;
 const CONTEXT_RE = /@(\S+)/g;
 
+const WEEKDAYS: Record<string, number> = {
+  domingo: 0,
+  lunes: 1,
+  martes: 2,
+  miercoles: 3,
+  jueves: 4,
+  viernes: 5,
+  sabado: 6,
+};
+
+const WEEKDAY_RE =
+  /\b(?:el\s+)?(pr[oó]ximo\s+)?(domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado)\b/i;
+const RELATIVE_DAY_RE = /\b(hoy|pasado\s+ma[ñn]ana|ma[ñn]ana)\b/i;
+
 export interface ParsedLine {
   priority: string | null;
   text: string;
   projects: string[];
   contexts: string[];
   urls: string[];
+  dueDate: string | null;
+}
+
+function stripAccents(s: string): string {
+  return s
+    .replace(/á/g, "a")
+    .replace(/é/g, "e")
+    .replace(/í/g, "i")
+    .replace(/ó/g, "o")
+    .replace(/ú/g, "u")
+    .replace(/ñ/g, "n");
+}
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(d: Date, days: number): Date {
+  const result = new Date(d);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+export interface DueDateMatch {
+  dueDate: string;
+  matchText: string;
+}
+
+/**
+ * Detects a Spanish relative-date phrase ("el sábado", "el próximo sábado",
+ * "hoy", "mañana", "pasado mañana") and resolves it to a concrete ISO date
+ * relative to `now`. Weekday names without "próximo" resolve to the nearest
+ * occurrence (today counts if it matches); with "próximo" it skips ahead a
+ * full extra week.
+ */
+export function extractDueDate(text: string, now: Date = new Date()): DueDateMatch | null {
+  const relMatch = text.match(RELATIVE_DAY_RE);
+  if (relMatch) {
+    const word = stripAccents(relMatch[0].toLowerCase()).replace(/\s+/g, " ");
+    let date = now;
+    if (word.startsWith("pasado")) date = addDays(now, 2);
+    else if (word === "manana") date = addDays(now, 1);
+    return { dueDate: isoDate(date), matchText: relMatch[0] };
+  }
+
+  const wdMatch = text.match(WEEKDAY_RE);
+  if (wdMatch) {
+    const hasProximo = Boolean(wdMatch[1]);
+    const dayName = stripAccents(wdMatch[2].toLowerCase());
+    const targetDow = WEEKDAYS[dayName];
+    const diff = (targetDow - now.getDay() + 7) % 7;
+    const date = addDays(now, diff + (hasProximo ? 7 : 0));
+    return { dueDate: isoDate(date), matchText: wdMatch[0] };
+  }
+
+  return null;
 }
 
 /**
  * Parses a single todo.txt-style line.
- * Priority "(A)" must be at the start. Projects (+x), contexts (@x) and URLs
- * are detected anywhere in the remaining text. URL contents are masked
- * before scanning for +/@ tags so query strings / emails inside a URL
- * don't get picked up as tags.
+ * Priority "(A)" must be at the start. Projects (+x), contexts (@x), URLs
+ * and a Spanish relative-date phrase are detected anywhere in the remaining
+ * text. URL contents are masked before scanning for +/@ tags so query
+ * strings / emails inside a URL don't get picked up as tags.
  */
-export function parseLine(raw: string): ParsedLine {
+export function parseLine(raw: string, now: Date = new Date()): ParsedLine {
   let text = raw.trim();
 
   let priority: string | null = null;
@@ -33,30 +106,45 @@ export function parseLine(raw: string): ParsedLine {
   const masked = text.replace(URL_RE, (m) => " ".repeat(m.length));
   const projects = [...masked.matchAll(PROJECT_RE)].map((m) => m[1]);
   const contexts = [...masked.matchAll(CONTEXT_RE)].map((m) => m[1]);
+  const dueDate = extractDueDate(masked, now)?.dueDate ?? null;
 
-  return { priority, text, projects, contexts, urls };
+  return { priority, text, projects, contexts, urls, dueDate };
 }
 
 /**
- * Strips +project/@context tags and URLs out of a task's text, leaving just
- * the prose description — used to render the clean task-body line while
- * tags/links are shown separately as meta badges.
+ * Strips +project/@context tags, URLs and a relative-date phrase out of a
+ * task's text, leaving just the prose description — used to render the
+ * clean task-body line while tags/links/date are shown separately as meta
+ * badges.
  */
 export function stripTags(text: string): string {
-  return text
-    .replace(URL_RE, "")
-    .replace(PROJECT_RE, "")
-    .replace(CONTEXT_RE, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  let result = text.replace(URL_RE, "").replace(PROJECT_RE, "").replace(CONTEXT_RE, "");
+  const dueMatch = extractDueDate(result);
+  if (dueMatch) result = result.replace(dueMatch.matchText, "");
+  return result.replace(/\s+/g, " ").trim();
 }
 
 export type HighlightToken = {
   text: string;
-  type: "plain" | "priority" | "project" | "context" | "url";
+  type: "plain" | "priority" | "project" | "context" | "url" | "date";
 };
 
 const TOKEN_RE = /(https?:\/\/\S+)|(\+\S+)|(@\S+)/g;
+
+function splitOutDate(token: HighlightToken): HighlightToken[] {
+  if (token.type !== "plain") return [token];
+  const match = token.text.match(RELATIVE_DAY_RE) ?? token.text.match(WEEKDAY_RE);
+  if (!match || match.index === undefined) return [token];
+
+  const before = token.text.slice(0, match.index);
+  const dateText = match[0];
+  const after = token.text.slice(match.index + dateText.length);
+  const parts: HighlightToken[] = [];
+  if (before) parts.push({ text: before, type: "plain" });
+  parts.push({ text: dateText, type: "date" });
+  if (after) parts.push({ text: after, type: "plain" });
+  return parts;
+}
 
 /**
  * Tokenizes a raw todo.txt line into typed spans, in order, for live syntax
@@ -90,5 +178,5 @@ export function tokenizeForHighlight(raw: string): HighlightToken[] {
     tokens.push({ text: rest.slice(lastIndex), type: "plain" });
   }
 
-  return tokens;
+  return tokens.flatMap(splitOutDate);
 }
