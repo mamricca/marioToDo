@@ -75,7 +75,7 @@ function buildPrompt(tasks: SummaryTask[]): string {
     bits.push(cleanBody(t.text) || t.text);
     if (t.projects.length) bits.push(`[proyecto: ${t.projects.join(", ")}]`);
     if (t.contexts.length) bits.push(`[contexto: ${t.contexts.join(", ")}]`);
-    if (t.dueDate) bits.push(`[vence: ${t.dueDate}]`);
+    if (t.dueDate) bits.push(`[fecha: ${t.dueDate}]`);
     return `- ${bits.join(" ")}`;
   });
 
@@ -88,9 +88,10 @@ Tareas activas:
 ${taskList}
 
 Instrucciones:
-- Resumen de 1 a 2 frases, priorizando lo vencido y las tareas de prioridad (A).
-- Formato de respuesta EXACTO: dos partes separadas por "|||". La primera parte es neutra (ej. cantidad de pendientes). La segunda parte es la frase que más urge remarcar (se resalta en rojo en la interfaz). Si no hay nada urgente que remarcar, devolvé solo la primera parte sin "|||".
-- Ejemplos de tono y formato: "Tres pendientes|||una vencida desde ayer" — "Nada urgente, pero +trabajo se está acumulando" — "Todo al día"
+- Resumen de 1 a 2 frases. Priorizá lo vencido y las tareas de prioridad (A), pero no te limites solo a eso: si no hay nada urgente, o incluso si lo hay, aprovechá para dar un panorama más general (algo que se está acumulando, un proyecto con varias tareas, etc.) en vez de enfocarte SIEMPRE únicamente en lo más urgente.
+- Cada tarea con [fecha: ...] puede ser una tarea con plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál y elegí el verbo acorde: para plazos usá "vence"/"hay que" ("Levantar recetas vence mañana"); para eventos usá "es"/"sucede" ("La despedida de Lelo es mañana"). Nunca digas que un evento "vence".
+- Formato de respuesta EXACTO: dos partes separadas por "|||". La primera parte es neutra (ej. cantidad de pendientes). La segunda parte es la frase que más vale la pena remarcar (se resalta en rojo en la interfaz) — no tiene que ser siempre lo más urgente, puede ser cualquier dato relevante del panorama general. Si no hay nada para remarcar, devolvé solo la primera parte sin "|||".
+- Ejemplos de tono y formato: "Tres pendientes|||una vencida desde ayer" — "Nada urgente|||pero +trabajo se está acumulando" — "Cinco pendientes|||la despedida de Lelo es mañana" — "Todo al día"
 - Si no hay tareas activas, devolvé algo breve tipo "Todo al día".
 - Devolvé SOLO el texto del resumen. Sin comillas, sin explicaciones, sin markdown.`;
 }

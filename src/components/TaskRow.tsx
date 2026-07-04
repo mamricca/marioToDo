@@ -80,6 +80,9 @@ export function TaskRow({
       setCompleting(true);
       timeoutRef.current = setTimeout(() => {
         onToggle(task.id);
+        // Nested rows don't leave the view when completed (only top-level
+        // tasks move to another tab) — reset so it doesn't stay invisible.
+        if (nested) setCompleting(false);
       }, COMPLETE_TRANSITION_MS);
     } else {
       onToggle(task.id);
