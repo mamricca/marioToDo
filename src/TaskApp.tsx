@@ -9,6 +9,7 @@ import {
   formatKicker,
   countPhrase,
   priorityClause,
+  splitSummary,
   getErrorMessage,
 } from "./format";
 import { sortTasks, isLinkOnly, type SortMode } from "./sort";
@@ -19,6 +20,7 @@ import {
   updateTaskDone,
   deleteTaskById,
 } from "./lib/tasksApi";
+import { fetchDailySummary, regenerateDailySummary } from "./lib/summaryApi";
 import type { Task, TagFilter, View } from "./types";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -39,6 +41,8 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   const [tagFilter, setTagFilter] = useState<TagFilter | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [pendingDelete, setPendingDelete] = useState<Task[] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingDeleteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Which top-level task the next "> sub-task" line should attach to.
@@ -50,6 +54,27 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
       .catch((err) => setErrorMessage(getErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    // Best-effort: if this fails, the headline just falls back to the
+    // locally computed one — not worth surfacing as an error banner.
+    fetchDailySummary()
+      .then((cached) => setAiSummary(cached?.summary ?? null))
+      .catch(() => setAiSummary(null));
+  }, []);
+
+  const handleRegenerateSummary = async () => {
+    setRegenerating(true);
+    try {
+      await regenerateDailySummary();
+      const cached = await fetchDailySummary();
+      setAiSummary(cached?.summary ?? null);
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err));
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   useEffect(() => {
     if (initialDraft) {
@@ -240,15 +265,32 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
     (t) => t.completedAt && Date.now() - t.completedAt < WEEK_MS
   ).length;
 
+  const { lead, accent } = aiSummary
+    ? splitSummary(aiSummary)
+    : {
+        lead: countPhrase(activeTasks.length, "pendiente", "pendientes", "m"),
+        accent: priorityCount > 0 ? priorityClause(priorityCount) : null,
+      };
+
   return (
     <div className="app">
       <div className="masthead">
-        <div className="kicker">{formatKicker(new Date())}</div>
+        <div className="kicker">
+          {formatKicker(new Date())}
+          <button
+            type="button"
+            className="regenerate-btn"
+            onClick={handleRegenerateSummary}
+            disabled={regenerating}
+            title="Regenerar resumen"
+            aria-label="Regenerar resumen"
+          >
+            {regenerating ? "…" : "↻"}
+          </button>
+        </div>
         <div className="headline">
-          {countPhrase(activeTasks.length, "pendiente", "pendientes", "m")}
-          {priorityCount > 0 && (
-            <span className="accent">{priorityClause(priorityCount)}</span>
-          )}
+          {lead}
+          {accent && <span className="accent">, {accent}</span>}
         </div>
       </div>
 
@@ -309,6 +351,7 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
 
       <div className="colophon">
         {colophonText(activeTasks.length, completedThisWeek)}
+        <span className="version"> · v{__APP_VERSION__}</span>
       </div>
 
       {pendingDelete && (

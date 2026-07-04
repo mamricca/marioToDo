@@ -49,10 +49,11 @@ export function countPhrase(
   return `${spanishNumber(n)} ${plural}`;
 }
 
+/** Bare clause, no leading punctuation — the caller glues it on. */
 export function priorityClause(n: number): string {
   if (n === 0) return "";
-  if (n === 1) return ", una con prioridad";
-  return `, ${spanishNumber(n)} con prioridad`;
+  if (n === 1) return "una con prioridad";
+  return `${spanishNumber(n)} con prioridad`;
 }
 
 export function colophonText(activeCount: number, completedThisWeek: number): string {
@@ -88,4 +89,11 @@ export function isOverdue(iso: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return parseIsoDate(iso).getTime() < today.getTime();
+}
+
+/** Splits the AI summary's "neutral|||highlighted" format from api/summary.ts. */
+export function splitSummary(summary: string): { lead: string; accent: string | null } {
+  const idx = summary.indexOf("|||");
+  if (idx === -1) return { lead: summary, accent: null };
+  return { lead: summary.slice(0, idx).trim(), accent: summary.slice(idx + 3).trim() };
 }

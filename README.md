@@ -20,9 +20,15 @@ instalable como PWA, con hosting 100% gratuito.
     cualquier parte del texto.
   - **URLs** `http(s)://...`, detectadas y mostradas como link
     clickeable.
-  - **Fechas relativas en español**: `el sábado`, `el próximo sábado`,
-    `hoy`, `mañana`, `pasado mañana` — se resuelven a una fecha
-    concreta y se muestran como badge en la tarea.
+  - **Fechas en español**: relativas (`el sábado`, `el próximo sábado`,
+    `hoy`, `mañana`, `pasado mañana`, `en 3 días`, `en una semana`) o
+    absolutas (`4 de julio`, `15/8`, `2026-07-15`) — se resuelven a
+    una fecha concreta y se muestran como badge en la tarea.
+  - **Montos**: `$45000`, `$1.234,56` se resaltan en dorado, sin
+    sacarlos del texto (a diferencia de tags/fecha/links).
+- **Sub-tareas**: escribir `> comprar pasajes` después de una tarea la
+  agrega como sub-tarea indentada, con su propio checkbox y un
+  contador "2/3" — completarlas no completa la tarea madre sola.
 - **Autocompletado** de `+proyecto` y `@contexto` ya usados: al
   escribir `+` o `@` aparece un dropdown filtrable, navegable con
   flechas y Enter/Tab.
@@ -40,7 +46,9 @@ instalable como PWA, con hosting 100% gratuito.
 - **Orden configurable**: por prioridad (A→Z) o por fecha, con un
   toggle aparte de los filtros.
 - El título de la página resume el estado en lenguaje natural ("3
-  pendientes, dos con prioridad") en vez de un encabezado fijo.
+  pendientes, dos con prioridad"), opcionalmente **generado por IA**
+  (Gemini) una vez por día — con fallback automático al cálculo local
+  si la IA no está configurada o falla.
 
 ### Edición y borrado
 
@@ -76,7 +84,9 @@ instalable como PWA, con hosting 100% gratuito.
 - [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (Workbox) para
   manifest + service worker.
 - Deploy en [Vercel](https://vercel.com/), conectado a GitHub para
-  deploy automático en cada push a `main`.
+  deploy automático en cada push a `main`. Una función serverless
+  (`api/summary.ts`) + un cron diario generan el resumen con la
+  [API de Gemini](https://aistudio.google.com/apikey) (opcional).
 
 ## Correrlo localmente
 

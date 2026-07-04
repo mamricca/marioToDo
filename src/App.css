@@ -67,12 +67,36 @@ input {
 }
 
 .kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 11.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-bottom: 10px;
+}
+
+.regenerate-btn {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.regenerate-btn:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.regenerate-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .headline {

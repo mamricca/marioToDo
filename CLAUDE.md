@@ -15,7 +15,7 @@ todo.txt, pensada para vivir 24/7 en Android y PC con hosting gratis.
 - Deploy: Vercel (free tier), conectado a GitHub para deploy
   automático.
 
-## Estado actual: deployado, rediseñado, con fechas relativas
+## Estado actual: deployado, con sub-tareas, montos y resumen IA
 
 **URL de producción: https://mario-to-do.vercel.app**
 **Repo: https://github.com/mamricca/marioToDo** (rama `main`, cada
@@ -35,7 +35,12 @@ push dispara un deploy automático en Vercel).
 5. Setear la contraseña del único usuario con `scripts/set-password.mjs`
    (ver "Login" abajo) — no usa magic link, no hace falta configurar
    Redirect URLs.
-6. `npm run dev`.
+6. (Opcional, para el resumen con IA) crear una API key gratis en
+   Google AI Studio y setear en Vercel `GEMINI_API_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY` y `CRON_SECRET` — ver sección "Resumen
+   diario con IA" más abajo. Sin esto la app funciona igual, solo usa
+   el titular calculado localmente.
+7. `npm run dev`.
 
 ### Qué hace
 
@@ -83,6 +88,22 @@ push dispara un deploy automático en Vercel).
   tarea; se muestran aparte, en una línea de metadatos debajo del
   texto (`task-meta`), no inline en la oración. El `raw`/`text`
   completo se preserva igual para poder editar sin perder nada.
+- **Montos resaltados**: `$45000`, `$45.000`, `$1.234,56` se colorean
+  en dorado apagado (`--money`), pero a diferencia de tags/fecha/URL
+  **no se sacan del cuerpo del texto** — quedan inline, como una
+  palabra más resaltada, no como badge aparte.
+- **Sub-tareas con `>`** (un solo nivel de profundidad): escribir
+  `> comprar pasajes` después de crear una tarea la agrega como
+  sub-tarea de la última tocada (rastreado con un ref, no por fecha de
+  creación — así funciona bien incluso cuando el "padre" es uno viejo
+  reencontrado por nombre duplicado). Se renderizan indentadas con su
+  propio checkbox y un contador "2/3" al lado del texto de la madre.
+  Completarlas todas **no** completa la madre automáticamente — eso lo
+  decide el usuario a mano. Escribir de nuevo el texto exacto de una
+  tarea madre existente no crea un duplicado: solo pasa a ser el
+  destino de las próximas líneas `>`. Borrar la madre borra sus
+  sub-tareas en cascada (`parent_id ... on delete cascade`); el toast
+  de deshacer trata al grupo completo (madre + hijas) como una unidad.
 - **Filtros por tabs + chips** (`src/components/Filters.tsx`):
   "Activas" / "Links" / "Archivadas" son mutuamente excluyentes; los
   chips de `+proyecto`/`@contexto` filtran dentro de la vista actual
@@ -131,26 +152,93 @@ push dispara un deploy automático en Vercel).
   `title`/`text`/`url` (desde el share sheet de Android, o desde el
   bookmarklet de escritorio — ver "Accesos rápidos") y arma una línea
   todo.txt precargada en el input para revisar/confirmar.
+- **Resumen diario con IA** (Gemini, ver sección aparte más abajo):
+  reemplaza el titular calculado por uno generado, en el mismo lugar y
+  tipografía, con fallback automático al cálculo local si la IA falla.
+- **Versión visible**: el colofón muestra `v{package.json version}`
+  (inyectada en build time vía `vite.config.ts` → `define`). Bumpear a
+  mano en cada cambio que se deployea, para que sea fácil notar cuándo
+  se actualizó la página (el service worker cachea el shell y a veces
+  no es obvio si ya tomó la versión nueva).
+
+### Resumen diario con IA (Gemini)
+
+Reemplaza el titular ("3 pendientes, dos con prioridad") por un
+resumen de 1-2 frases generado por Gemini, cacheado en Postgres para
+no llamar a la API en cada carga de página.
+
+- **`api/summary.ts`**: función serverless de Vercel (Node, **no**
+  Vite — no puede importar `src/lib/supabaseClient.ts` ni
+  `tasksApi.ts` porque usan `import.meta.env`, que no existe en este
+  runtime; arma su propio cliente de Supabase con `process.env` y la
+  **service_role key**, que bypassea RLS). Junta las tareas activas de
+  primer nivel (sin sub-tareas, sin los "solo link" de la tab Links),
+  arma un prompt pidiéndole a Gemini (`gemini-2.5-flash-lite`) un
+  resumen en el mismo tono lacónico del titular, con el texto de cada
+  tarea ya limpio de URLs/tags/fecha (`stripTags`) — los links nunca
+  se mandan a Google.
+  - El modelo devuelve el resumen en dos partes separadas por `|||`
+    (parte neutra + parte a resaltar en rojo); `format.splitSummary`
+    las separa en el frontend para mantener el mismo tratamiento de
+    acento que el titular calculado.
+  - Si la llamada a Gemini falla, la función **no toca** el resumen
+    cacheado existente (evita pisar un buen resumen con un error) y
+    responde con status de error — el frontend simplemente sigue
+    mostrando lo que tenía cacheado, o cae al titular local si nunca
+    hubo un resumen guardado. Nunca se muestra un error crudo.
+- **Auth de la función**: dos caminos válidos, sin endpoint público
+  abierto (evita que cualquiera con la URL gaste la cuota de Gemini).
+  - `GET` (lo usa el cron de Vercel): header
+    `Authorization: Bearer <CRON_SECRET>` — Vercel lo agrega solo
+    cuando el env var `CRON_SECRET` está seteado.
+  - `POST` (botón manual "↻" al lado del titular, en `src/lib/summaryApi.ts`):
+    header `Authorization: Bearer <access_token de la sesión>`,
+    verificado server-side con `supabase.auth.getUser(token)`.
+- **Disparo automático**: `vercel.json` → `crons` llama a
+  `/api/summary` todos los días a las 9:00 UTC (6:00 en Argentina/
+  Uruguay). El plan gratuito de Vercel permite cron jobs de hasta una
+  vez por día, que es exactamente lo que necesitamos.
+- **Tabla `daily_summary`**: una fila por usuario (`user_id` es la PK),
+  con `summary` y `generated_at`. RLS solo permite `select` de la
+  propia fila — únicamente la función serverless (con service_role)
+  escribe.
+- **Variables de entorno nuevas en Vercel** (Project Settings →
+  Environment Variables, nunca en `.env` del repo):
+  - `GEMINI_API_KEY` — de Google AI Studio (https://aistudio.google.com/apikey).
+  - `SUPABASE_SERVICE_ROLE_KEY` — Project Settings → API → `service_role`.
+  - `CRON_SECRET` — cualquier string random, generado una sola vez.
+  - Reusa `VITE_SUPABASE_URL` ya existente (server-side, `process.env`
+    ve todas las env vars del proyecto sin importar el prefijo `VITE_`,
+    ese prefijo solo controla qué se bundlea al cliente).
+- `api/tsconfig.json` es un tsconfig aparte solo para poder correr
+  `tsc --noEmit -p api/tsconfig.json` localmente — Vercel compila la
+  función con su propio bundler al deployar, no depende de esto.
 
 ### Estructura
 
 ```
+api/
+  summary.ts                   # función serverless: genera/cachea el resumen IA
+  tsconfig.json                 # solo para tsc local, Vercel no lo usa
 src/
   types.ts                  # Task, View, TagFilter
-  format.ts                  # texto en español: conteos, kicker, colofón, fecha
+  format.ts                  # texto en español: conteos, kicker, colofón,
+                               # fecha, splitSummary
   sort.ts                     # sortTasks (prioridad/fecha), isLinkOnly
-  parser.ts                    # parseLine, stripTags, extractDueDate,
-                                 # tokenizeForHighlight
+  parser.ts                    # parseLine, stripTags, extractDueDate
+                                 # (DATE_MATCHERS), tokenizeForHighlight, MONEY_RE
   shareTarget.ts               # consumeShareTarget (lee /share-target?...)
   lib/
     supabaseClient.ts          # cliente supabase-js, lee VITE_SUPABASE_*
     tasksApi.ts                 # fetch/insert/update/delete de la tabla tasks
+    summaryApi.ts                # fetch/regenerate del resumen IA cacheado
   hooks/
     useAuth.ts                   # sesión actual + suscripción a cambios
   components/
     Login.tsx                     # email + contraseña
     CaptureInput.tsx                # input con resaltado en vivo + autocompletado
-    TaskRow.tsx                      # fila: check, pri-mark, body, meta, actions
+    TaskRow.tsx                      # fila: check, pri-mark, body, meta, actions,
+                                       # sub-tareas anidadas
     TaskList.tsx                      # solo renderiza; el orden lo decide TaskApp
     Filters.tsx                       # tabs Activas/Links/Archivadas + chips + orden
     Toast.tsx                          # deshacer borrado
@@ -165,11 +253,16 @@ scripts/
   gen-icons.py                 # regenera public/icons/*.png (requiere Pillow)
   set-password.mjs             # setea la contraseña vía Admin API (sin email)
 supabase/
-  schema.sql                  # tabla tasks + políticas RLS (estado completo)
+  schema.sql                  # tabla tasks + tabla daily_summary + políticas
+                                # RLS (estado completo)
   migrations/
-    0001_due_date.sql           # ALTER TABLE due_date (correr en proyectos ya
-                                  # creados antes de esta fecha)
-vite.config.ts                # VitePWA: manifest + workbox + share_target
+    0001_due_date.sql           # ALTER TABLE due_date
+    0002_subtasks.sql            # ALTER TABLE parent_id
+    0003_daily_summary.sql        # CREATE TABLE daily_summary
+                                    # (correr en orden en proyectos ya creados)
+vite.config.ts                # VitePWA: manifest + workbox + share_target;
+                                # __APP_VERSION__ desde package.json
+vercel.json                   # rewrite SPA (excluye /api) + cron diario
 .env.example                  # variables VITE_SUPABASE_URL/ANON_KEY
 ```
 
@@ -188,10 +281,6 @@ vite.config.ts                # VitePWA: manifest + workbox + share_target
   magic link u otros emails transaccionales sin el rate limit del
   servicio compartido de Supabase — no urgente ahora que el login es
   por contraseña.
-- Fechas relativas: por ahora solo días de la semana + hoy/mañana/
-  pasado mañana. Si hace falta, se podría sumar "en N días", fechas
-  absolutas (`15/8`), o un segundo campo de prioridad temporal
-  distinto del recálculo dinámico actual (ver nota en "Decisiones").
 
 ## Decisiones / notas para retomar
 
@@ -220,6 +309,11 @@ vite.config.ts                # VitePWA: manifest + workbox + share_target
   (soft-delete solo en el cliente hasta que expira el timeout).
 - No se usó ningún framework de UI pesado ni librería de manejo de
   estado (Redux/Zustand) — a propósito, dado el tamaño de la app.
+- Versionado visible: bumpear `version` en `package.json` (semver
+  informal, no hay releases/tags todavía) en cada commit que se
+  deployea. Pedido explícito del usuario para notar cuándo la PWA
+  instalada (que cachea el shell vía service worker) ya tomó los
+  cambios nuevos.
 - PWA: se usó `vite-plugin-pwa` (Workbox) en vez de escribir el
   service worker a mano. `devOptions.enabled: true` lo registra
   también en `npm run dev` para probar instalación/offline antes de
