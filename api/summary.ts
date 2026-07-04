@@ -1,11 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { stripTags } from "../src/parser";
-import { isLinkOnly } from "../src/sort";
-import type { Task } from "../src/types";
 
-// Minimal local types instead of depending on @vercel/node at runtime —
-// it's a devDependency, and importing its types (even type-only) risks
-// Vercel's function bundler trying to actually require it at cold start.
+// Self-contained on purpose: no imports from ../src. This function runs in
+// Vercel's Node runtime, not Vite's — relative imports crossing into src/
+// (which is built/resolved by Vite for the browser bundle) were causing
+// FUNCTION_INVOCATION_FAILED at cold start. Duplicating this handful of
+// small pure helpers is cheaper than debugging cross-directory module
+// resolution across two different build pipelines.
+
+// Minimal local request/response types instead of depending on
+// @vercel/node at runtime (it's a devDependency).
 interface MinimalRequest {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
@@ -17,6 +20,19 @@ interface MinimalResponse {
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
+const URL_RE = /https?:\/\/[^\s]+/g;
+const PROJECT_RE = /\+(\S+)/g;
+const CONTEXT_RE = /@(\S+)/g;
+
+interface SummaryTask {
+  priority: string | null;
+  text: string;
+  projects: string[];
+  contexts: string[];
+  urls: string[];
+  dueDate: string | null;
+}
+
 interface TaskRow {
   text: string;
   priority: string | null;
@@ -24,34 +40,39 @@ interface TaskRow {
   contexts: string[];
   urls: string[];
   due_date: string | null;
-  parent_id: string | null;
-  done: boolean;
-  created_at: string;
-  completed_at: string | null;
 }
 
-function rowToTask(row: TaskRow, id: string): Task {
+function rowToSummaryTask(row: TaskRow): SummaryTask {
   return {
-    id,
-    raw: row.text,
-    text: row.text,
     priority: row.priority,
+    text: row.text,
     projects: row.projects,
     contexts: row.contexts,
     urls: row.urls,
     dueDate: row.due_date,
-    parentId: row.parent_id,
-    done: row.done,
-    createdAt: new Date(row.created_at).getTime(),
-    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
   };
 }
 
-function buildPrompt(tasks: Task[]): string {
+/** Same idea as parser.stripTags — URLs never reach the prompt. */
+function cleanBody(text: string): string {
+  return text
+    .replace(URL_RE, "")
+    .replace(PROJECT_RE, "")
+    .replace(CONTEXT_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Same rule as sort.isLinkOnly — saved links don't count as "pending work". */
+function isLinkOnly(t: SummaryTask): boolean {
+  return !t.priority && t.projects.length === 0 && t.contexts.length === 0 && t.urls.length > 0;
+}
+
+function buildPrompt(tasks: SummaryTask[]): string {
   const lines = tasks.map((t) => {
     const bits: string[] = [];
     if (t.priority) bits.push(`(${t.priority})`);
-    bits.push(stripTags(t.text) || t.text);
+    bits.push(cleanBody(t.text) || t.text);
     if (t.projects.length) bits.push(`[proyecto: ${t.projects.join(", ")}]`);
     if (t.contexts.length) bits.push(`[contexto: ${t.contexts.join(", ")}]`);
     if (t.dueDate) bits.push(`[vence: ${t.dueDate}]`);
@@ -138,17 +159,13 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
 
     const { data: rows, error: tasksError } = await supabase
       .from("tasks")
-      .select(
-        "id, text, priority, projects, contexts, urls, due_date, parent_id, done, created_at, completed_at"
-      )
+      .select("text, priority, projects, contexts, urls, due_date, parent_id, done")
       .eq("user_id", userId)
       .eq("done", false)
       .is("parent_id", null);
     if (tasksError) throw new Error(tasksError.message);
 
-    const tasks = (rows as (TaskRow & { id: string })[])
-      .map((row) => rowToTask(row, row.id))
-      .filter((t) => !isLinkOnly(t));
+    const tasks = (rows as TaskRow[]).map(rowToSummaryTask).filter((t) => !isLinkOnly(t));
 
     const prompt = buildPrompt(tasks);
     const summary = await callGemini(prompt);
