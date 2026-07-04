@@ -1,8 +1,19 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { stripTags } from "../src/parser";
 import { isLinkOnly } from "../src/sort";
 import type { Task } from "../src/types";
+
+// Minimal local types instead of depending on @vercel/node at runtime —
+// it's a devDependency, and importing its types (even type-only) risks
+// Vercel's function bundler trying to actually require it at cold start.
+interface MinimalRequest {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+interface MinimalResponse {
+  status(code: number): MinimalResponse;
+  json(body: unknown): void;
+}
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
@@ -88,35 +99,36 @@ async function callGemini(prompt: string): Promise<string> {
   return text.trim();
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    res.status(500).json({ ok: false, error: "Faltan variables de Supabase en el server" });
-    return;
-  }
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-  const authHeader = req.headers.authorization ?? "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-
-  if (req.method === "GET") {
-    if (!process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
-      res.status(401).json({ ok: false, error: "No autorizado" });
-      return;
-    }
-  } else if (req.method === "POST") {
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) {
-      res.status(401).json({ ok: false, error: "No autorizado" });
-      return;
-    }
-  } else {
-    res.status(405).json({ ok: false, error: "Método no permitido" });
-    return;
-  }
-
+export default async function handler(req: MinimalRequest, res: MinimalResponse) {
   try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      res.status(500).json({ ok: false, error: "Faltan variables de Supabase en el server" });
+      return;
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const authHeaderRaw = req.headers.authorization;
+    const authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+
+    if (req.method === "GET") {
+      if (!process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+        res.status(401).json({ ok: false, error: "No autorizado" });
+        return;
+      }
+    } else if (req.method === "POST") {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData.user) {
+        res.status(401).json({ ok: false, error: "No autorizado" });
+        return;
+      }
+    } else {
+      res.status(405).json({ ok: false, error: "Método no permitido" });
+      return;
+    }
+
     // App de un solo usuario: tomamos el único usuario registrado.
     const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
     if (usersError || !users.users[0]) {
@@ -126,7 +138,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: rows, error: tasksError } = await supabase
       .from("tasks")
-      .select("id, text, priority, projects, contexts, urls, due_date, parent_id, done, created_at, completed_at")
+      .select(
+        "id, text, priority, projects, contexts, urls, due_date, parent_id, done, created_at, completed_at"
+      )
       .eq("user_id", userId)
       .eq("done", false)
       .is("parent_id", null);
