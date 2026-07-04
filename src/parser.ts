@@ -13,9 +13,32 @@ const WEEKDAYS: Record<string, number> = {
   sabado: 6,
 };
 
+const MONTHS: Record<string, number> = {
+  enero: 0,
+  febrero: 1,
+  marzo: 2,
+  abril: 3,
+  mayo: 4,
+  junio: 5,
+  julio: 6,
+  agosto: 7,
+  septiembre: 8,
+  setiembre: 8,
+  octubre: 9,
+  noviembre: 10,
+  diciembre: 11,
+};
+
 const WEEKDAY_RE =
   /\b(?:el\s+)?(pr[oó]ximo\s+)?(domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado)\b/i;
 const RELATIVE_DAY_RE = /\b(hoy|pasado\s+ma[ñn]ana|ma[ñn]ana)\b/i;
+const RELATIVE_DAYS_COUNT_RE = /\ben\s+(\d+)\s+d[ií]as?\b/i;
+const RELATIVE_WEEKS_RE = /\ben\s+(una|\d+)\s+semanas?\b/i;
+const MONTH_DAY_RE =
+  /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/i;
+// DD/MM(/YYYY) — día primero, como se usa en español rioplatense.
+const SLASH_DATE_RE = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+const ISO_DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/;
 
 export interface ParsedLine {
   priority: string | null;
@@ -49,38 +72,127 @@ function addDays(d: Date, days: number): Date {
   return result;
 }
 
+function startOfDay(d: Date): Date {
+  const result = new Date(d);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+const INVALID_DATE = new Date(NaN);
+
+interface DateMatcher {
+  regex: RegExp;
+  resolve: (match: RegExpMatchArray, now: Date) => Date;
+}
+
+/**
+ * Each entry tries its regex against the text and, if matched, resolves a
+ * concrete Date from it. Order = priority when multiple phrases could
+ * theoretically match; checked top to bottom, first match wins.
+ */
+const DATE_MATCHERS: DateMatcher[] = [
+  {
+    // hoy / mañana / pasado mañana
+    regex: RELATIVE_DAY_RE,
+    resolve: (match, now) => {
+      const word = stripAccents(match[0].toLowerCase()).replace(/\s+/g, " ");
+      if (word.startsWith("pasado")) return addDays(now, 2);
+      if (word === "manana") return addDays(now, 1);
+      return now;
+    },
+  },
+  {
+    // en 3 días
+    regex: RELATIVE_DAYS_COUNT_RE,
+    resolve: (match, now) => addDays(now, parseInt(match[1], 10)),
+  },
+  {
+    // en una semana / en 2 semanas
+    regex: RELATIVE_WEEKS_RE,
+    resolve: (match, now) => {
+      const n = match[1].toLowerCase() === "una" ? 1 : parseInt(match[1], 10);
+      return addDays(now, n * 7);
+    },
+  },
+  {
+    // el sábado / el próximo sábado
+    regex: WEEKDAY_RE,
+    resolve: (match, now) => {
+      const hasProximo = Boolean(match[1]);
+      const dayName = stripAccents(match[2].toLowerCase());
+      const targetDow = WEEKDAYS[dayName];
+      const diff = (targetDow - now.getDay() + 7) % 7;
+      return addDays(now, diff + (hasProximo ? 7 : 0));
+    },
+  },
+  {
+    // 2026-07-15
+    regex: ISO_DATE_RE,
+    resolve: (match) =>
+      new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  },
+  {
+    // 4 de julio — sin año: este año, o el que viene si ya pasó.
+    regex: MONTH_DAY_RE,
+    resolve: (match, now) => {
+      const day = parseInt(match[1], 10);
+      const month = MONTHS[stripAccents(match[2].toLowerCase())];
+      let date = new Date(now.getFullYear(), month, day);
+      if (date.getMonth() !== month) return INVALID_DATE;
+      if (date.getTime() < startOfDay(now).getTime()) {
+        date = new Date(now.getFullYear() + 1, month, day);
+      }
+      return date;
+    },
+  },
+  {
+    // 15/8 o 15/8/2026 (día/mes, no mes/día)
+    regex: SLASH_DATE_RE,
+    resolve: (match, now) => {
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      let year = match[3] ? parseInt(match[3], 10) : now.getFullYear();
+      if (year < 100) year += 2000;
+      let date = new Date(year, month, day);
+      if (date.getMonth() !== month) return INVALID_DATE;
+      if (!match[3] && date.getTime() < startOfDay(now).getTime()) {
+        date = new Date(year + 1, month, day);
+      }
+      return date;
+    },
+  },
+];
+
+function findDateMatch(text: string): RegExpMatchArray | null {
+  for (const matcher of DATE_MATCHERS) {
+    const match = text.match(matcher.regex);
+    if (match) return match;
+  }
+  return null;
+}
+
 export interface DueDateMatch {
   dueDate: string;
   matchText: string;
 }
 
 /**
- * Detects a Spanish relative-date phrase ("el sábado", "el próximo sábado",
- * "hoy", "mañana", "pasado mañana") and resolves it to a concrete ISO date
- * relative to `now`. Weekday names without "próximo" resolve to the nearest
- * occurrence (today counts if it matches); with "próximo" it skips ahead a
- * full extra week.
+ * Detects a date phrase — relative ("el sábado", "el próximo sábado", "hoy",
+ * "mañana", "pasado mañana", "en 3 días", "en una semana") or absolute
+ * ("4 de julio", "15/8", "2026-07-15") — and resolves it to a concrete ISO
+ * date relative to `now`. Weekday names without "próximo" resolve to the
+ * nearest occurrence (today counts if it matches); with "próximo" it skips
+ * ahead a full extra week. Absolute dates without a year roll forward to
+ * next year if that date already passed this year.
  */
 export function extractDueDate(text: string, now: Date = new Date()): DueDateMatch | null {
-  const relMatch = text.match(RELATIVE_DAY_RE);
-  if (relMatch) {
-    const word = stripAccents(relMatch[0].toLowerCase()).replace(/\s+/g, " ");
-    let date = now;
-    if (word.startsWith("pasado")) date = addDays(now, 2);
-    else if (word === "manana") date = addDays(now, 1);
-    return { dueDate: isoDate(date), matchText: relMatch[0] };
+  for (const matcher of DATE_MATCHERS) {
+    const match = text.match(matcher.regex);
+    if (!match) continue;
+    const date = matcher.resolve(match, now);
+    if (isNaN(date.getTime())) continue;
+    return { dueDate: isoDate(date), matchText: match[0] };
   }
-
-  const wdMatch = text.match(WEEKDAY_RE);
-  if (wdMatch) {
-    const hasProximo = Boolean(wdMatch[1]);
-    const dayName = stripAccents(wdMatch[2].toLowerCase());
-    const targetDow = WEEKDAYS[dayName];
-    const diff = (targetDow - now.getDay() + 7) % 7;
-    const date = addDays(now, diff + (hasProximo ? 7 : 0));
-    return { dueDate: isoDate(date), matchText: wdMatch[0] };
-  }
-
   return null;
 }
 
@@ -137,7 +249,7 @@ const TOKEN_RE = /(https?:\/\/\S+)|(\+\S+)|(@\S+)|(\$\d(?:[\d.,]*\d)?)/g;
 
 function splitOutDate(token: HighlightToken): HighlightToken[] {
   if (token.type !== "plain") return [token];
-  const match = token.text.match(RELATIVE_DAY_RE) ?? token.text.match(WEEKDAY_RE);
+  const match = findDateMatch(token.text);
   if (!match || match.index === undefined) return [token];
 
   const before = token.text.slice(0, match.index);

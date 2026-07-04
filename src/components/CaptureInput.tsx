@@ -190,8 +190,8 @@ export const CaptureInput = forwardRef<HTMLInputElement, CaptureInputProps>(
         </div>
         <p className="capture-hint">
           <kbd>/</kbd> para escribir · (A) texto +proyecto @contexto https://url
-          el sábado / mañana · $monto · empezá con {'>'} para sumar una
-          sub-tarea a la última tarea
+          el sábado / 4 de julio / 15/8 / en 3 días · $monto · empezá con{" "}
+          {'>'} para sumar una sub-tarea a la última tarea
         </p>
       </div>
     );

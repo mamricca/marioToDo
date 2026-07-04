@@ -52,15 +52,22 @@ push dispara un deploy automático en Vercel).
   aparece un dropdown con las categorías/contextos ya usados,
   filtrado por lo que sigue escribiendo. Flechas para navegar,
   Enter/Tab para aceptar, click también funciona.
-- **Fechas relativas en español** (`parser.ts`, función
-  `extractDueDate`): reconoce `el sábado`, `el próximo sábado`, `hoy`,
-  `mañana`, `pasado mañana` en cualquier parte del texto y calcula una
-  fecha concreta (ISO `YYYY-MM-DD`, guardada en `due_date`).
+- **Fechas en español** (`parser.ts`, función `extractDueDate`,
+  lista `DATE_MATCHERS`): reconoce, en cualquier parte del texto, y
+  calcula una fecha concreta (ISO `YYYY-MM-DD`, guardada en
+  `due_date`):
+  - Relativas: `hoy`, `mañana`, `pasado mañana`, `en 3 días`,
+    `en una semana` / `en 2 semanas`.
+  - Días de la semana: `el sábado`, `el próximo sábado`.
+  - Absolutas: `4 de julio`, `15/8` (día/mes, no mes/día),
+    `15/8/2027`, `2026-07-15`.
   - `el <día>` sin "próximo" → la próxima ocurrencia de ese día,
     contando hoy mismo si hoy es ese día.
   - `el próximo <día>` → salta una semana completa además de eso
     (si hoy es sábado, "el próximo sábado" es el de la semana que
     viene, no hoy).
+  - Fechas absolutas sin año (`4 de julio`, `15/8`) asumen el año
+    actual, o el que viene si esa fecha ya pasó este año.
   - La fecha se recalcula cada vez que se re-parsea la línea (por
     ejemplo al editar la tarea) usando el momento actual — si el
     texto sigue diciendo "el sábado" semanas después, va a apuntar al
