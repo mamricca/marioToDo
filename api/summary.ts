@@ -68,7 +68,80 @@ function isLinkOnly(t: SummaryTask): boolean {
   return !t.priority && t.projects.length === 0 && t.contexts.length === 0 && t.urls.length > 0;
 }
 
-function buildPrompt(tasks: SummaryTask[]): string {
+// Montevideo, Uruguay. Open-Meteo is free and needs no API key/signup.
+const WEATHER_LAT = -34.9011;
+const WEATHER_LON = -56.1645;
+
+const WEATHER_CODES: Record<number, string> = {
+  0: "despejado",
+  1: "mayormente despejado",
+  2: "parcialmente nublado",
+  3: "nublado",
+  45: "con niebla",
+  48: "con niebla escarchada",
+  51: "con llovizna leve",
+  53: "con llovizna",
+  55: "con llovizna intensa",
+  56: "con llovizna helada",
+  57: "con llovizna helada intensa",
+  61: "con lluvia leve",
+  63: "con lluvia",
+  65: "con lluvia intensa",
+  66: "con lluvia helada",
+  67: "con lluvia helada intensa",
+  71: "con nevadas leves",
+  73: "con nevadas",
+  75: "con nevadas intensas",
+  77: "con nieve granulada",
+  80: "con chaparrones leves",
+  81: "con chaparrones",
+  82: "con chaparrones intensos",
+  85: "con chaparrones de nieve leves",
+  86: "con chaparrones de nieve intensos",
+  95: "con tormenta",
+  96: "con tormenta y granizo leve",
+  99: "con tormenta y granizo intenso",
+};
+
+/** Best-effort — returns null on any failure, prompt just skips weather. */
+async function fetchWeather(): Promise<string | null> {
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
+      `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max` +
+      `&timezone=America%2FMontevideo&forecast_days=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const daily = json?.daily;
+    if (!daily) return null;
+
+    const code = daily.weathercode?.[0];
+    const tmax = daily.temperature_2m_max?.[0];
+    const tmin = daily.temperature_2m_min?.[0];
+    const rainChance = daily.precipitation_probability_max?.[0];
+    const wind = daily.windspeed_10m_max?.[0];
+
+    const bits: string[] = [];
+    if (typeof tmin === "number" && typeof tmax === "number") {
+      bits.push(`${Math.round(tmin)}°C a ${Math.round(tmax)}°C`);
+    }
+    if (typeof code === "number" && WEATHER_CODES[code]) bits.push(WEATHER_CODES[code]);
+    if (typeof rainChance === "number" && rainChance >= 30) {
+      bits.push(`${Math.round(rainChance)}% de probabilidad de lluvia`);
+    }
+    if (typeof wind === "number" && wind >= 30) {
+      bits.push(`viento fuerte (${Math.round(wind)} km/h)`);
+    }
+
+    return bits.length > 0 ? bits.join(", ") : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildPrompt(tasks: SummaryTask[], weather: string | null): string {
   const lines = tasks.map((t) => {
     const bits: string[] = [];
     if (t.priority) bits.push(`(${t.priority})`);
@@ -81,22 +154,24 @@ function buildPrompt(tasks: SummaryTask[]): string {
 
   const taskList = lines.length > 0 ? lines.join("\n") : "(sin tareas activas)";
   const today = new Date().toISOString().slice(0, 10);
+  const weatherLine = weather ? `\nClima hoy en Montevideo: ${weather}.\n` : "";
 
   return `Sos la voz de un titular editorial personal: alguien que conoce bien esta lista de tareas y la resume con criterio propio, no un bot que enumera. Tono directo, expresivo, con personalidad — no formulaico, no repitas siempre la misma estructura de una llamada a la otra. Hoy es ${today}.
 
 Tareas activas:
 ${taskList}
-
+${weatherLine}
 Instrucciones:
 - El resumen tiene que ser sobre las tareas mismas — 1 a 2 frases que cuenten qué hay para hacer. NO agregues una segunda frase de relleno/comentario tipo "todo tranquilo", "nada para preocuparse", "todo en marcha" salvo que la lista esté genuinamente vacía. Si ya contaste las tareas relevantes, ahí termina — no le sumes una coda tranquilizadora sin información nueva.
 - Parafraseá, no copies el texto de la tarea tal cual — inferí de qué se trata y contalo con tus palabras, como lo diría una persona, no como una transcripción. Ejemplo: una tarea que dice literalmente "levantar las recetas de medicamentos" se puede contar como "pasar por la farmacia" o "buscar los remedios" — no repitas "recetas de medicamentos" textual.
 - Priorizá lo vencido y las tareas de prioridad (A), pero no te limites a eso: sumá panorama general cuando aporte (un proyecto que se acumula, dos o tres tareas relacionadas contadas como una sola idea). Mezclá y conectá tareas distintas si tiene sentido, no las trates como ítems sueltos de una lista.
 - Cada tarea con [fecha: ...] puede ser un plazo (algo que hay que hacer para esa fecha) o un evento que simplemente ocurre ese día — juzgá por el texto cuál es cuál. Para plazos usá "vence"/"hay que"; para eventos usá "es"/"sucede", con una construcción natural (no siempre "mañana la despedida de X" — variá: "X se despide mañana", "mañana es la despedida de X", etc.). Nunca digas que un evento "vence".
-- Formato de respuesta EXACTO: dos partes separadas por "|||". Se muestran una al lado de la otra con UN SOLO espacio entre ellas — nosotros no agregamos ninguna puntuación, así que la puntuación de unión (coma, punto y espacio, nada) la ponés vos al final de la primera parte o al principio de la segunda, la que use. La segunda parte es otro dato concreto de las tareas (no un comentario) que vale la pena remarcar (se resalta en rojo). Si con una sola frase ya está completo, devolvé solo esa parte, sin "|||" — no inventes una segunda parte solo por rellenar.
+- Si hay datos de clima, integralo al titular como parte del panorama del día — no es opcional ni un aparte, es un ingrediente más de cómo pintás el día (ej. arrancar con "Día frío y ventoso" o similar antes de entrar en las tareas). Si además calza con una tarea puntual (algo afuera, algo que requiera abrigo), mejor, pero incluso si no calza con ninguna tarea igual merece su lugar en la frase — es contexto del día, no un dato descartable.
+- Formato de respuesta EXACTO: dos partes separadas por "|||". Se muestran una al lado de la otra con UN SOLO espacio entre ellas — nosotros no agregamos ninguna puntuación, así que la puntuación de unión (coma, punto y espacio, nada) la ponés vos al final de la primera parte o al principio de la segunda, la que use. La segunda parte es otro dato concreto (de las tareas o del clima) que vale la pena remarcar (se resalta en rojo). Si con una sola frase ya está completo, devolvé solo esa parte, sin "|||" — no inventes una segunda parte solo por rellenar.
 - Ejemplos (fijate que la puntuación de unión ya viene incluida en el texto, para que la concatenación con un espacio quede natural, y que la segunda parte siempre es información, nunca una muletilla):
-  - "Tres pendientes," + " " + "una vencida desde ayer." → "Tres pendientes,|||una vencida desde ayer."
+  - "Día frío y con lluvia," + " " + "tres pendientes y una vencida desde ayer." → "Día frío y con lluvia,|||tres pendientes y una vencida desde ayer."
   - "Dos cosas para mañana:" + " " + "la despedida de Lelo y pasar por la farmacia." → "Dos cosas para mañana:|||la despedida de Lelo y pasar por la farmacia."
-  - Una sola tarea, alcanza con una frase: "Solo tenés que pasar por la farmacia hoy." (sin "|||")
+  - Una sola tarea, alcanza con una frase: "Ventoso hoy — solo tenés que pasar por la farmacia." (sin "|||")
 - Si no hay tareas activas, algo breve y con onda tipo "Todo al día." o "Lista vacía, disfrutalo."
 - Devolvé SOLO el texto del resumen. Sin comillas, sin explicaciones, sin markdown.`;
 }
@@ -172,8 +247,9 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     if (tasksError) throw new Error(tasksError.message);
 
     const tasks = (rows as TaskRow[]).map(rowToSummaryTask).filter((t) => !isLinkOnly(t));
+    const weather = await fetchWeather();
 
-    const prompt = buildPrompt(tasks);
+    const prompt = buildPrompt(tasks, weather);
     const summary = await callGemini(prompt);
 
     const { error: upsertError } = await supabase.from("daily_summary").upsert({
