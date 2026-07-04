@@ -47,8 +47,8 @@ instalable como PWA, con hosting 100% gratuito.
   toggle aparte de los filtros.
 - El título de la página resume el estado en lenguaje natural ("3
   pendientes, dos con prioridad"), opcionalmente **generado por IA**
-  (Gemini) una vez por día — con fallback automático al cálculo local
-  si la IA no está configurada o falla.
+  (Gemini) — ver sección aparte más abajo. Con fallback automático al
+  cálculo local si la IA no está configurada o falla.
 
 ### Edición y borrado
 
@@ -66,8 +66,33 @@ instalable como PWA, con hosting 100% gratuito.
 - **Share Target**: compartís un link desde Chrome en Android (o un
   bookmarklet en desktop) directo a la app, que arma la tarea con
   título + URL.
-- Tema oscuro "editorial": Fraunces + Instrument Sans + IBM Plex Mono,
-  acento usado con moderación (solo prioridad alta y estados de foco).
+- Tema oscuro "editorial": Newsreader (titular) + Hanken Grotesk (UI) +
+  JetBrains Mono (sintaxis), acento usado con moderación (solo
+  prioridad alta y estados de foco).
+- Número de versión visible en el pie de página (`v0.1.x`) — útil para
+  notar cuándo la PWA instalada ya tomó una actualización, dado que el
+  service worker cachea el shell.
+
+### Resumen diario con IA (opcional)
+
+- El titular puede reemplazarse por un resumen de 1-2 frases generado
+  por **Gemini** (`gemini-2.5-flash-lite`), con una voz editorial
+  personal: parafrasea las tareas (no las copia tal cual), prioriza lo
+  vencido y la prioridad alta, pero también da panorama general en vez
+  de listar sin criterio.
+- Incorpora el **clima del día en Montevideo** ([Open-Meteo](https://open-meteo.com/),
+  gratis y sin API key) como parte del panorama, no como un dato
+  aparte.
+- Se recalcula solo una vez por día (cron de Vercel) y se cachea en la
+  base — no se llama a la API en cada carga de página. Un botón
+  discreto (↻) al lado del titular permite regenerarlo manualmente en
+  cualquier momento.
+- Si la IA falla (sin cuota, sin conexión, etc.) el titular cae al
+  cálculo local automáticamente — nunca se muestra un error ni queda
+  vacío.
+- Requiere configurar variables de entorno propias (ver "Correrlo
+  localmente" abajo); sin ellas la app funciona igual, solo sin este
+  agregado.
 
 ### Cuenta
 
@@ -99,14 +124,29 @@ npm run dev
 Necesitás un proyecto propio de Supabase:
 
 1. Crear proyecto gratis en https://supabase.com.
-2. Correr `supabase/schema.sql` en el SQL Editor (crea la tabla
-   `tasks` con RLS). Si el proyecto es de antes de la fecha de este
-   commit, correr también lo que haya en `supabase/migrations/`.
+2. Correr `supabase/schema.sql` en el SQL Editor (crea las tablas
+   `tasks` y `daily_summary` con RLS). Si el proyecto es de antes de
+   la fecha de este commit, correr también lo que haya en
+   `supabase/migrations/`, en orden.
 3. Copiar `Project URL` y `anon public key` (Project Settings → API) a
    `.env`.
 4. Setear la contraseña del usuario con `scripts/set-password.mjs`
    (usa la Admin API de Supabase, no manda ningún email — ver
    comentarios en el script).
+
+Opcional, para el resumen con IA (si se omite, la app funciona igual
+sin este agregado) — variables de entorno en **Vercel** (Project
+Settings → Environment Variables, nunca en `.env` del repo):
+
+| Variable | De dónde sale |
+| --- | --- |
+| `GEMINI_API_KEY` | https://aistudio.google.com/apikey (gratis) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` |
+| `CRON_SECRET` | Cualquier string random que generes vos, una sola vez |
+
+`VITE_SUPABASE_URL` no hace falta duplicarla — la función serverless
+la reusa vía `process.env` aunque tenga el prefijo `VITE_`, ese
+prefijo solo afecta qué se bundlea al cliente.
 
 ## Scripts
 
