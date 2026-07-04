@@ -1,32 +1,114 @@
-# React + TypeScript + Vite
+# Todos
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+App personal de lista de tareas, estilo **todo.txt**, para un solo
+usuario. Pensada para vivir 24/7 en el celular (Android) y la PC,
+instalable como PWA, con hosting 100% gratuito.
 
-Currently, two official plugins are available:
+**En producción:** https://mario-to-do.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+### Captura y sintaxis
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Captura rápida en un solo input, con **resaltado de sintaxis en
+  vivo** mientras escribís:
+  ```
+  (A) Terminar informe +trabajo @compu el sábado https://ejemplo.com
+  ```
+  - **Prioridad** `(A)`–`(Z)` al inicio de línea.
+  - **Categorías** `+proyecto` y **contextos** `@contexto` en
+    cualquier parte del texto.
+  - **URLs** `http(s)://...`, detectadas y mostradas como link
+    clickeable.
+  - **Fechas relativas en español**: `el sábado`, `el próximo sábado`,
+    `hoy`, `mañana`, `pasado mañana` — se resuelven a una fecha
+    concreta y se muestran como badge en la tarea.
+- **Autocompletado** de `+proyecto` y `@contexto` ya usados: al
+  escribir `+` o `@` aparece un dropdown filtrable, navegable con
+  flechas y Enter/Tab.
+- Atajo `/` enfoca el input desde cualquier parte de la página; `Esc`
+  cierra el autocompletado o limpia el input.
 
-## Expanding the Oxlint configuration
+### Organización
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+- **Tabs**: Activas / Links / Archivadas.
+  - Una tarea sin prioridad, sin `+proyecto` ni `@contexto` pero con
+    un link se trata como "link guardado" y vive en su propia pestaña
+    en vez de mezclarse con las tareas accionables.
+- **Chips** de `+proyecto`/`@contexto` con contador en vivo, para
+  filtrar dentro de la vista actual.
+- **Orden configurable**: por prioridad (A→Z) o por fecha, con un
+  toggle aparte de los filtros.
+- El título de la página resume el estado en lenguaje natural ("3
+  pendientes, dos con prioridad") en vez de un encabezado fijo.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+### Edición y borrado
+
+- Completar (checkbox) archiva la tarea con una transición suave — no
+  se pierde, queda en "Archivadas".
+- Editar con doble click o el link "editar" (aparece al pasar el
+  mouse); re-parsea la línea completa al confirmar.
+- Borrar con **deshacer**: un toast de 5 segundos antes de que el
+  borrado sea definitivo.
+
+### PWA / multiplataforma
+
+- **Instalable** en Android y escritorio (manifest + service worker),
+  con soporte offline básico del shell de la app.
+- **Share Target**: compartís un link desde Chrome en Android (o un
+  bookmarklet en desktop) directo a la app, que arma la tarea con
+  título + URL.
+- Tema oscuro "editorial": Fraunces + Instrument Sans + IBM Plex Mono,
+  acento usado con moderación (solo prioridad alta y estados de foco).
+
+### Cuenta
+
+- Login por email + contraseña (pensado para un solo usuario).
+- Todo persiste en Postgres (Supabase), con Row Level Security por
+  usuario.
+
+## Stack
+
+- [Vite](https://vite.dev/) + [React](https://react.dev/) +
+  TypeScript, sin librerías de estado ni UI kit.
+- [Supabase](https://supabase.com/) (Postgres + Auth), acceso vía
+  `@supabase/supabase-js`.
+- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (Workbox) para
+  manifest + service worker.
+- Deploy en [Vercel](https://vercel.com/), conectado a GitHub para
+  deploy automático en cada push a `main`.
+
+## Correrlo localmente
+
+```bash
+npm install
+cp .env.example .env   # completar con las credenciales de tu proyecto de Supabase
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Necesitás un proyecto propio de Supabase:
+
+1. Crear proyecto gratis en https://supabase.com.
+2. Correr `supabase/schema.sql` en el SQL Editor (crea la tabla
+   `tasks` con RLS). Si el proyecto es de antes de la fecha de este
+   commit, correr también lo que haya en `supabase/migrations/`.
+3. Copiar `Project URL` y `anon public key` (Project Settings → API) a
+   `.env`.
+4. Setear la contraseña del usuario con `scripts/set-password.mjs`
+   (usa la Admin API de Supabase, no manda ningún email — ver
+   comentarios en el script).
+
+## Scripts
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción (incluye el service worker) |
+| `npm run preview` | Sirve el build de producción localmente |
+| `npm run lint` | Lint con oxlint |
+| `python scripts/gen-icons.py` | Regenera los íconos de `public/icons/` |
+
+## Notas de diseño
+
+Detalles de arquitectura, decisiones tomadas y roadmap en
+[`CLAUDE.md`](CLAUDE.md).
