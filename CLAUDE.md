@@ -15,7 +15,7 @@ todo.txt, pensada para vivir 24/7 en Android y PC con hosting gratis.
 - Deploy: Vercel (free tier), conectado a GitHub para deploy
   automático.
 
-## Estado actual: deployado, con sub-tareas, montos y resumen IA
+## Estado actual: deployado, con sub-tareas, montos, resumen IA y modo Noticias
 
 **URL de producción: https://mario-to-do.vercel.app**
 **Repo: https://github.com/mamricca/marioToDo** (rama `main`, cada
@@ -39,8 +39,13 @@ push dispara un deploy automático en Vercel).
    Google AI Studio y setear en Vercel `GEMINI_API_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY` y `CRON_SECRET` — ver sección "Resumen
    diario con IA" más abajo. Sin esto la app funciona igual, solo usa
-   el titular calculado localmente.
-7. `npm run dev`.
+   el titular calculado localmente. Las mismas tres variables alimentan
+   también el modo Noticias (sección aparte más abajo).
+7. Los feeds RSS del modo Noticias se seedean solos al correr
+   `supabase/migrations/0004_feeds.sql` (paso 3). Para agregar/sacar
+   feeds después, editar la tabla `feeds` a mano desde el SQL Editor —
+   no hay UI para esto, es a propósito (un solo usuario).
+8. `npm run dev`.
 
 ### Qué hace
 
@@ -155,6 +160,12 @@ push dispara un deploy automático en Vercel).
 - **Resumen diario con IA** (Gemini, ver sección aparte más abajo):
   reemplaza el titular calculado por uno generado, en el mismo lugar y
   tipografía, con fallback automático al cálculo local si la IA falla.
+- **Modo Noticias** (toggle "Agenda"/"Noticias" junto a la fecha, ver
+  sección aparte más abajo): una segunda sección del mismo diario con
+  ítems de RSS en vez de tareas, mismo lenguaje visual (líneas
+  hairline, sin tarjetas), con su propio titular generado por IA. El
+  modo elegido se guarda en `localStorage` y se recuerda entre
+  sesiones.
 - **Versión visible**: el colofón muestra `v{package.json version}`
   (inyectada en build time vía `vite.config.ts` → `define`). Bumpear a
   mano en cada cambio que se deployea, para que sea fácil notar cuándo
@@ -214,16 +225,73 @@ no llamar a la API en cada carga de página.
   `tsc --noEmit -p api/tsconfig.json` localmente — Vercel compila la
   función con su propio bundler al deployar, no depende de esto.
 
+### Modo Noticias (RSS + IA)
+
+Segunda sección del diario: en vez de tareas, una lista de ítems de
+RSS de ~10 feeds configurados a mano (Uruguay, política, tech, diseño
+web, esports, deportes — ver `feeds` en `supabase/migrations/0004_feeds.sql`),
+con un titular propio generado por Gemini con el mismo pipeline que el
+resumen de tareas.
+
+- **`api/news.ts`**: función serverless de Vercel, mismo patrón
+  self-contained que `api/summary.ts` (sin imports de `../src`, cliente
+  Supabase propio con la service_role key). En un solo request: (1)
+  **ingesta** — trae la tabla `feeds`, parsea cada URL con
+  `rss-parser` y hace `upsert` de los ítems nuevos en `feed_items`
+  (dedup por `(feed_id, link)`, un feed caído no aborta los demás),
+  (2) recién después arma el prompt con los ítems sin leer ya
+  frescos + clima de Montevideo (mismo Open-Meteo que el resumen de
+  tareas) y se lo manda a Gemini, (3) cachea el resultado en
+  `news_summary`. El orden importa: ingerir antes de resumir, si no el
+  titular describe la corrida anterior.
+  - Mismo formato `|||` (parte neutra + parte a resaltar) y mismo
+    fallback: si Gemini falla, no toca el cache existente y responde
+    error — el frontend cae al cálculo local (`newsFallbackHeadline`/
+    `newsColophonText` en `format.ts`).
+  - Al prompt no se le pasan fechas ISO crudas para que las resuelva
+    el modelo — mismo motivo que `describeDueDate` en `api/summary.ts`
+    (un modelo chico haciendo aritmética de fechas alucina); en su
+    lugar cada ítem lleva un rótulo ya resuelto ("hace 3h", "ayer").
+- **Por qué un solo cron y no ingesta cada 1-4hs**: el plan gratuito
+  de Vercel solo permite cron jobs una vez por día (igual que el
+  resumen de tareas), así que `/api/news` no puede correr con más
+  frecuencia sin pagar. La ingesta más frecuente que sí querés viene
+  del botón manual "↻" (`regenerateNewsSummary` en
+  `lib/newsSummaryApi.ts`), que dispara el mismo endpoint on-demand
+  cuando abrís el modo Noticias — el cron diario es solo el piso
+  mínimo si no abrís la app.
+- **Auth de la función**: idéntica a `api/summary.ts` — `GET` con
+  `CRON_SECRET` para el cron, `POST` con el `access_token` de la
+  sesión para el botón manual.
+- **Tablas**: `feeds` (id, name, url) y `feed_items` (feed_id, title,
+  link, published_at, read, fetched_at, únicos por `(feed_id, link)`)
+  — RLS de solo lectura para el usuario autenticado, y también
+  `update` en `feed_items` porque el toggle de leído/no leído corre en
+  el cliente (con la anon key, no la service_role). `news_summary` es
+  igual a `daily_summary` (una fila por usuario, solo la función
+  serverless escribe).
+- **"→ todo"** (`NewsApp.tsx`, función `convertToTask`): arma una
+  tarea nueva con `${título} ${link}` y la inserta directo con
+  `insertTask` (mismo parser que Agenda, el link se detecta solo como
+  URL) — no hace falta que `TaskApp` esté montado, cuando cambiés a
+  Agenda esa tarea ya va a estar ahí porque `TaskApp` siempre refetchea
+  al montar. También marca el ítem como leído.
+- **Variables de entorno**: ninguna nueva — reusa
+  `GEMINI_API_KEY`/`SUPABASE_SERVICE_ROLE_KEY`/`CRON_SECRET` del
+  resumen de tareas.
+
 ### Estructura
 
 ```
 api/
-  summary.ts                   # función serverless: genera/cachea el resumen IA
+  summary.ts                   # función serverless: genera/cachea el resumen IA de tareas
+  news.ts                       # función serverless: ingesta RSS + resumen IA de noticias
   tsconfig.json                 # solo para tsc local, Vercel no lo usa
 src/
-  types.ts                  # Task, View, TagFilter
+  types.ts                  # Task, View, TagFilter, Mode, Feed, FeedItem, NewsView
   format.ts                  # texto en español: conteos, kicker, colofón,
-                               # fecha, splitSummary
+                               # fecha, splitSummary, formatRelativeTime,
+                               # newsFallbackHeadline, newsColophonText
   sort.ts                     # sortTasks (prioridad/fecha), isLinkOnly
   parser.ts                    # parseLine, stripTags, extractDueDate
                                  # (DATE_MATCHERS), tokenizeForHighlight, MONEY_RE
@@ -231,7 +299,9 @@ src/
   lib/
     supabaseClient.ts          # cliente supabase-js, lee VITE_SUPABASE_*
     tasksApi.ts                 # fetch/insert/update/delete de la tabla tasks
-    summaryApi.ts                # fetch/regenerate del resumen IA cacheado
+    summaryApi.ts                # fetch/regenerate del resumen IA de tareas cacheado
+    feedsApi.ts                   # fetch de feeds/feed_items, toggle de leído
+    newsSummaryApi.ts              # fetch/regenerate del resumen IA de noticias cacheado
   hooks/
     useAuth.ts                   # sesión actual + suscripción a cambios
   components/
@@ -241,9 +311,14 @@ src/
                                        # sub-tareas anidadas
     TaskList.tsx                      # solo renderiza; el orden lo decide TaskApp
     Filters.tsx                       # tabs Activas/Links/Archivadas + chips + orden
+    ModeToggle.tsx                     # pastilla Agenda/Noticias, junto al kicker
+    NewsFilters.tsx                     # tabs No leídas/Todas + chips por feed
+    NewsList.tsx / NewsItemRow.tsx       # lista de ítems: dot leído/no leído,
+                                           # título=link, "→ todo", toggle leído
     Toast.tsx                          # deshacer borrado
-  App.tsx                    # auth gate: Login o TaskApp
-  TaskApp.tsx                 # la app en sí: estado, wiring, masthead/colofón
+  App.tsx                    # auth gate + elige TaskApp o NewsApp según `mode`
+  TaskApp.tsx                 # modo Agenda: estado, wiring, masthead/colofón
+  NewsApp.tsx                  # modo Noticias: mismo layout, datos de feed_items
   App.css                     # tema editorial dark completo
 public/
   icons/                      # icon-{192,512}.png, icon-maskable-*.png,
@@ -253,16 +328,18 @@ scripts/
   gen-icons.py                 # regenera public/icons/*.png (requiere Pillow)
   set-password.mjs             # setea la contraseña vía Admin API (sin email)
 supabase/
-  schema.sql                  # tabla tasks + tabla daily_summary + políticas
-                                # RLS (estado completo)
+  schema.sql                  # tasks + daily_summary + feeds + feed_items +
+                                # news_summary + políticas RLS (estado completo)
   migrations/
     0001_due_date.sql           # ALTER TABLE due_date
     0002_subtasks.sql            # ALTER TABLE parent_id
     0003_daily_summary.sql        # CREATE TABLE daily_summary
-                                    # (correr en orden en proyectos ya creados)
+    0004_feeds.sql                  # CREATE TABLE feeds/feed_items/news_summary
+                                      # + seed de los feeds configurados
+                                      # (correr en orden en proyectos ya creados)
 vite.config.ts                # VitePWA: manifest + workbox + share_target;
                                 # __APP_VERSION__ desde package.json
-vercel.json                   # rewrite SPA (excluye /api) + cron diario
+vercel.json                   # rewrite SPA (excluye /api) + 2 crons diarios
 .env.example                  # variables VITE_SUPABASE_URL/ANON_KEY
 ```
 
@@ -328,3 +405,9 @@ vercel.json                   # rewrite SPA (excluye /api) + cron diario
   Propiedades → Acceso directo → Tecla de método abreviado) y un
   bookmarklet de Edge que reutiliza `/share-target` para mandar
   cualquier link de escritorio a la app con un click.
+- Modo Noticias: la ingesta de RSS y el resumen IA viven en el mismo
+  endpoint (`api/news.ts`) disparado por un solo cron diario, en vez
+  de un cron aparte cada 1-4hs — decisión explícita del usuario al
+  toparse con que Vercel free solo permite cron una vez por día. La
+  frescura "real" viene de tocar el botón manual "↻" al abrir el modo,
+  no de la automatización.

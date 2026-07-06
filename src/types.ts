@@ -25,3 +25,28 @@ export interface TagFilter {
   type: "project" | "context";
   value: string;
 }
+
+/** Top-level section of the app — persisted in localStorage. */
+export type Mode = "agenda" | "noticias";
+
+export interface Feed {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface FeedItem {
+  id: string;
+  feedId: string;
+  feedName: string;
+  title: string;
+  link: string;
+  /** ms epoch, null if the feed didn't provide a publish date. */
+  publishedAt: number | null;
+  read: boolean;
+  /** ms epoch — when our own ingestion first saved this item. */
+  fetchedAt: number;
+}
+
+/** Mutually-exclusive tabs in modo Noticias. */
+export type NewsView = "unread" | "all";

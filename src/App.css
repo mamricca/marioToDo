@@ -66,6 +66,44 @@ input {
   margin-bottom: 6px;
 }
 
+.masthead-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--rule);
+  border-radius: 20px;
+  padding: 3px;
+}
+
+.mode-toggle button {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  padding: 5px 13px;
+  border-radius: 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mode-toggle button.active {
+  background: var(--rule);
+  color: var(--ink);
+}
+
 .kicker {
   display: flex;
   align-items: center;
@@ -595,6 +633,70 @@ input {
 
 .actions button:hover {
   color: var(--ink);
+}
+
+/* ---------- news (modo Noticias) ---------- */
+
+.items {
+  margin-top: 22px;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.item:first-child {
+  padding-top: 0;
+}
+
+.item:hover .actions,
+.item:focus-within .actions {
+  opacity: 1;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.dot.read {
+  background: none;
+  border: 1.5px solid var(--ink-faint);
+  width: 6px;
+  height: 6px;
+  margin: 7px 1px 0;
+}
+
+.item-body-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-title {
+  font-size: 15.5px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.item-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.item.read .item-title {
+  color: var(--ink-dim);
 }
 
 .empty-message {

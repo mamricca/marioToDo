@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CaptureInput } from "./components/CaptureInput";
 import { TaskList } from "./components/TaskList";
 import { Filters } from "./components/Filters";
+import { ModeToggle } from "./components/ModeToggle";
 import { Toast } from "./components/Toast";
 import { parseLine, stripTags } from "./parser";
 import {
@@ -21,7 +22,7 @@ import {
   deleteTaskById,
 } from "./lib/tasksApi";
 import { fetchDailySummary, regenerateDailySummary } from "./lib/summaryApi";
-import type { Task, TagFilter, View } from "./types";
+import type { Task, TagFilter, View, Mode } from "./types";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const UNDO_WINDOW_MS = 5000;
@@ -31,9 +32,18 @@ interface TaskAppProps {
   userEmail: string | undefined;
   onSignOut: () => void;
   initialDraft: string | null;
+  mode: Mode;
+  onModeChange: (mode: Mode) => void;
 }
 
-function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
+function TaskApp({
+  userId,
+  userEmail,
+  onSignOut,
+  initialDraft,
+  mode,
+  onModeChange,
+}: TaskAppProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -324,18 +334,21 @@ function TaskApp({ userId, userEmail, onSignOut, initialDraft }: TaskAppProps) {
   return (
     <div className="app">
       <div className="masthead">
-        <div className="kicker">
-          {formatKicker(new Date())}
-          <button
-            type="button"
-            className="regenerate-btn"
-            onClick={handleRegenerateSummary}
-            disabled={regenerating}
-            title="Regenerar resumen"
-            aria-label="Regenerar resumen"
-          >
-            {regenerating ? "…" : "↻"}
-          </button>
+        <div className="masthead-row">
+          <div className="kicker">
+            {formatKicker(new Date())}
+            <button
+              type="button"
+              className="regenerate-btn"
+              onClick={handleRegenerateSummary}
+              disabled={regenerating}
+              title="Regenerar resumen"
+              aria-label="Regenerar resumen"
+            >
+              {regenerating ? "…" : "↻"}
+            </button>
+          </div>
+          <ModeToggle mode={mode} onChange={onModeChange} />
         </div>
         <div className="headline">
           {lead}

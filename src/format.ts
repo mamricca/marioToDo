@@ -97,3 +97,41 @@ export function splitSummary(summary: string): { lead: string; accent: string | 
   if (idx === -1) return { lead: summary, accent: null };
   return { lead: summary.slice(0, idx).trim(), accent: summary.slice(idx + 3).trim() };
 }
+
+/** "hace 3h" / "ayer" / "hace 4d" style label for a feed item's timestamp;
+ * falls back to the same short date badge as tasks once it's over a week old. */
+export function formatRelativeTime(ms: number): string {
+  const diffMin = Math.round((Date.now() - ms) / 60_000);
+  if (diffMin < 1) return "recién";
+  if (diffMin < 60) return `hace ${diffMin}m`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `hace ${diffH}h`;
+  const diffD = Math.round(diffH / 24);
+  if (diffD === 1) return "ayer";
+  if (diffD < 7) return `hace ${diffD}d`;
+  return formatDueDate(isoDate(new Date(ms)));
+}
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function isToday(ms: number): boolean {
+  return isoDate(new Date(ms)) === isoDate(new Date());
+}
+
+/** Local fallback headline for modo Noticias when there's no cached AI summary. */
+export function newsFallbackHeadline(unreadCount: number): string {
+  if (unreadCount === 0) return "Feeds al día.";
+  return `${countPhrase(unreadCount, "ítem nuevo", "ítems nuevos", "m")} para leer.`;
+}
+
+/** Local fallback colophon for modo Noticias, same spirit as colophonText. */
+export function newsColophonText(newToday: number, activeFeedCount: number): string {
+  const left = countPhrase(newToday, "ítem nuevo", "ítems nuevos", "m");
+  const right = countPhrase(activeFeedCount, "feed activo", "feeds activos", "m");
+  return `${left} hoy — ${right}`;
+}
