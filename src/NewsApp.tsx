@@ -3,6 +3,7 @@ import { NewsFilters } from "./components/NewsFilters";
 import { NewsList } from "./components/NewsList";
 import { ModeToggle } from "./components/ModeToggle";
 import { parseLine } from "./parser";
+import { interleaveByFeed } from "./sort";
 import {
   formatKicker,
   splitSummary,
@@ -90,9 +91,9 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
   };
 
   const viewItems = view === "unread" ? items.filter((i) => !i.read) : items;
-  const displayedItems = feedFilter
-    ? viewItems.filter((i) => i.feedId === feedFilter)
-    : viewItems;
+  const displayedItems = interleaveByFeed(
+    feedFilter ? viewItems.filter((i) => i.feedId === feedFilter) : viewItems
+  );
 
   const unreadCount = items.filter((i) => !i.read).length;
   const newTodayCount = useMemo(
