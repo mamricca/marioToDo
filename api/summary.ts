@@ -141,19 +141,59 @@ async function fetchWeather(): Promise<string | null> {
   }
 }
 
+// UTC's calendar date runs 3h ahead of Uruguay's after 21:00 local — using
+// new Date().toISOString() there told Gemini "hoy" was already tomorrow,
+// one day ahead of every due_date (which is computed in local time).
+function todayInMontevideo(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MONTH_NAMES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+function parseISODate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+// Resolves the ISO due_date into the phrase Gemini should use verbatim,
+// instead of handing it the raw ISO string and trusting a small model to do
+// date arithmetic itself (that's how "el lunes" drifted to the wrong day —
+// it was guessing the weekday for a date instead of being told it).
+function describeDueDate(dueDateIso: string, todayIso: string): string {
+  const due = parseISODate(dueDateIso);
+  const today = parseISODate(todayIso);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+
+  if (diffDays === 0) return "hoy";
+  if (diffDays === 1) return "mañana";
+  if (diffDays === 2) return "pasado mañana";
+  if (diffDays > 2 && diffDays < 7) return `el ${WEEKDAY_NAMES[due.getUTCDay()]}`;
+  const monthDay = `${due.getUTCDate()} de ${MONTH_NAMES[due.getUTCMonth()]}`;
+  return diffDays < 0 ? `venció el ${monthDay}` : `el ${monthDay}`;
+}
+
 function buildPrompt(tasks: SummaryTask[], weather: string | null): string {
+  const today = todayInMontevideo();
   const lines = tasks.map((t) => {
     const bits: string[] = [];
     if (t.priority) bits.push(`(${t.priority})`);
     bits.push(cleanBody(t.text) || t.text);
     if (t.projects.length) bits.push(`[proyecto: ${t.projects.join(", ")}]`);
     if (t.contexts.length) bits.push(`[contexto: ${t.contexts.join(", ")}]`);
-    if (t.dueDate) bits.push(`[fecha: ${t.dueDate}]`);
+    if (t.dueDate) bits.push(`[fecha: ${describeDueDate(t.dueDate, today)}]`);
     return `- ${bits.join(" ")}`;
   });
 
   const taskList = lines.length > 0 ? lines.join("\n") : "(sin tareas activas)";
-  const today = new Date().toISOString().slice(0, 10);
   const weatherLine = weather ? `\nClima hoy en Montevideo: ${weather}.\n` : "";
 
   return `Sos la voz de un titular editorial personal: alguien que conoce bien esta lista de tareas y la resume con criterio propio, no un bot que enumera. Tono directo, expresivo, con personalidad — no formulaico, no repitas siempre la misma estructura de una llamada a la otra. Hoy es ${today}.
