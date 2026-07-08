@@ -14,7 +14,7 @@ import {
 } from "./format";
 import { fetchFeeds, fetchFeedItems, setFeedItemRead, setFeedMuted } from "./lib/feedsApi";
 import { insertTask } from "./lib/tasksApi";
-import { fetchNewsSummary, regenerateNewsSummary } from "./lib/newsSummaryApi";
+import { fetchNewsSummary, regenerateNewsSummary, refreshFeeds } from "./lib/newsSummaryApi";
 import type { Feed, FeedItem, Mode, NewsView } from "./types";
 
 interface NewsAppProps {
@@ -34,6 +34,7 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
   const [feedFilter, setFeedFilter] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     Promise.all([fetchFeeds(), fetchFeedItems()])
@@ -51,6 +52,21 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
       .catch(() => setAiSummary(null));
   }, []);
 
+  // Ingesta sola, sin gastar cuota de Gemini — pensado para tocar seguido.
+  const handleRefreshFeeds = async () => {
+    setRefreshing(true);
+    try {
+      await refreshFeeds();
+      setItems(await fetchFeedItems());
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Ingesta + resumen IA — esto sí cuesta una llamada a Gemini, de forma
+  // deliberada (botón aparte, no el de refresh de todos los días).
   const handleRegenerateSummary = async () => {
     setRegenerating(true);
     try {
@@ -134,12 +150,21 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
             <button
               type="button"
               className="regenerate-btn"
+              onClick={handleRefreshFeeds}
+              disabled={refreshing}
+              title="Actualizar feed (sin gastar cuota de Gemini)"
+              aria-label="Actualizar feed"
+            >
+              {refreshing ? "…" : "↻"}
+            </button>
+            <button
+              type="button"
+              className="regenerate-btn text"
               onClick={handleRegenerateSummary}
               disabled={regenerating}
-              title="Actualizar noticias"
-              aria-label="Actualizar noticias"
+              title="Regenerar titular con IA (gasta cuota de Gemini)"
             >
-              {regenerating ? "…" : "↻"}
+              {regenerating ? "regenerando…" : "regenerar titular"}
             </button>
           </div>
           <ModeToggle mode={mode} onChange={onModeChange} />

@@ -252,6 +252,12 @@ resumen de tareas.
     el modelo — mismo motivo que `describeDueDate` en `api/summary.ts`
     (un modelo chico haciendo aritmética de fechas alucina); en su
     lugar cada ítem lleva un rótulo ya resuelto ("hace 3h", "ayer").
+- **Dos botones separados** (`NewsApp.tsx`, junto a la fecha): el ícono
+  "↻" llama a `refreshFeeds()` (`/api/news?summary=0`) — solo ingesta,
+  sin llamar a Gemini, pensado para tocar seguido. "regenerar titular"
+  es el que sí gasta cuota (`regenerateNewsSummary()`, mismo endpoint
+  sin el query param). El query param solo lo manda el botón manual; el
+  cron nunca lo manda, así que siempre corre el pipeline completo.
 - **Por qué un solo cron y no ingesta cada 1-4hs**: el plan gratuito
   de Vercel solo permite cron jobs una vez por día (igual que el
   resumen de tareas), así que `/api/news` no puede correr con más

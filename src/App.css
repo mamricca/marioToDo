@@ -137,6 +137,12 @@ input {
   opacity: 0.6;
 }
 
+.regenerate-btn.text {
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .headline {
   font-family: var(--font-display);
   font-weight: 500;

@@ -9,6 +9,9 @@ import Parser from "rss-parser";
 interface MinimalRequest {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
+  // Populated automatically by Vercel's Node runtime from the URL's query
+  // string, even without importing @vercel/node's types for it.
+  query?: Record<string, string | string[] | undefined>;
 }
 interface MinimalResponse {
   status(code: number): MinimalResponse;
@@ -254,6 +257,15 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     // Ingestión primero — el resumen tiene que verse los ítems recién
     // traídos, no los de la corrida anterior.
     await ingestFeeds(supabase, feeds as FeedRow[]);
+
+    // Botón "actualizar feed" del frontend: solo ingesta, sin gastar cuota
+    // de Gemini. El cron y el botón "regenerar titular" no mandan este
+    // parámetro, así que siguen corriendo el pipeline completo.
+    const skipSummary = req.query?.summary === "0";
+    if (skipSummary) {
+      res.status(200).json({ ok: true, summary: null });
+      return;
+    }
 
     const { data: unreadRows, error: unreadError } = await supabase
       .from("feed_items")
