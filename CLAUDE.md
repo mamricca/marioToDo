@@ -344,7 +344,9 @@ supabase/
     0003_daily_summary.sql        # CREATE TABLE daily_summary
     0004_feeds.sql                  # CREATE TABLE feeds/feed_items/news_summary
                                       # + seed de los feeds configurados
-                                      # (correr en orden en proyectos ya creados)
+    0005_feed_muted.sql               # ALTER TABLE feeds ADD muted
+    0006_feeds_update.sql              # ajusta la lista de feeds (altas/bajas)
+                                         # (correr en orden en proyectos ya creados)
 vite.config.ts                # VitePWA: manifest + workbox + share_target;
                                 # __APP_VERSION__ desde package.json
 vercel.json                   # rewrite SPA (excluye /api) + 2 crons diarios

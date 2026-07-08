@@ -117,14 +117,14 @@ create policy "Users can select their own news summary"
 
 insert into public.feeds (name, url) values
   ('la diaria', 'https://ladiaria.com.uy/feeds/articulos'),
-  ('Jacobin', 'https://jacobin.com/feed'),
+  ('Jacobin LatAm', 'https://jacobinlat.com/feed/'),
+  ('Politico', 'https://rss.politico.com/politics-news.xml'),
+  ('AP News', 'https://feedx.net/rss/ap.xml'),
   ('Anthropic News', 'https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml'),
   ('Hacker News', 'https://hnrss.org/frontpage'),
-  ('Simon Willison', 'https://simonwillison.net/atom/everything/'),
-  ('CSS-Tricks', 'https://css-tricks.com/feed/'),
   ('Smashing Magazine', 'https://www.smashingmagazine.com/feed/'),
-  ('web.dev', 'https://web.dev/feed.xml'),
   ('HLTV', 'https://www.hltv.org/rss/news'),
   ('Sheep Esports', 'https://www.sheepesports.com/en/lol'),
-  ('ESPN', 'https://www.espn.com/espn/rss/news')
+  ('ESPN', 'https://www.espn.com/espn/rss/news'),
+  ('Soccernews', 'https://www.soccernews.com/feed')
 on conflict (url) do nothing;
