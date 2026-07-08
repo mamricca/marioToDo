@@ -7,6 +7,7 @@ interface NewsFiltersProps {
   viewItems: FeedItem[];
   feedFilter: string | null;
   onFeedFilterChange: (feedId: string | null) => void;
+  onToggleMute: (feedId: string, muted: boolean) => void;
 }
 
 export function NewsFilters({
@@ -16,6 +17,7 @@ export function NewsFilters({
   viewItems,
   feedFilter,
   onFeedFilterChange,
+  onToggleMute,
 }: NewsFiltersProps) {
   const toggleFeed = (feedId: string) => {
     onFeedFilterChange(feedFilter === feedId ? null : feedId);
@@ -43,14 +45,24 @@ export function NewsFilters({
       {feeds.length > 0 && <span className="filter-sep">|</span>}
 
       {feeds.map((feed) => (
-        <button
-          key={feed.id}
-          type="button"
-          className={`chip ctx${feedFilter === feed.id ? " active" : ""}`}
-          onClick={() => toggleFeed(feed.id)}
-        >
-          {feed.name} <span className="count">{countFor(feed.id)}</span>
-        </button>
+        <span key={feed.id} className="chip-wrap">
+          <button
+            type="button"
+            className={`chip ctx${feedFilter === feed.id ? " active" : ""}${
+              feed.muted ? " muted" : ""
+            }`}
+            onClick={() => toggleFeed(feed.id)}
+          >
+            {feed.name} <span className="count">{countFor(feed.id)}</span>
+          </button>
+          <button
+            type="button"
+            className="chip-mute"
+            onClick={() => onToggleMute(feed.id, !feed.muted)}
+          >
+            {feed.muted ? "activar" : "silenciar"}
+          </button>
+        </span>
       ))}
     </nav>
   );

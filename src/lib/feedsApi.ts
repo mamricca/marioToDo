@@ -26,9 +26,17 @@ function rowToFeedItem(row: FeedItemRow): FeedItem {
 }
 
 export async function fetchFeeds(): Promise<Feed[]> {
-  const { data, error } = await supabase.from("feeds").select("id, name, url").order("name");
+  const { data, error } = await supabase
+    .from("feeds")
+    .select("id, name, url, muted")
+    .order("name");
   if (error) throw error;
   return data as Feed[];
+}
+
+export async function setFeedMuted(id: string, muted: boolean): Promise<void> {
+  const { error } = await supabase.from("feeds").update({ muted }).eq("id", id);
+  if (error) throw error;
 }
 
 export async function fetchFeedItems(): Promise<FeedItem[]> {

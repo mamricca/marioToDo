@@ -263,13 +263,21 @@ resumen de tareas.
 - **Auth de la función**: idéntica a `api/summary.ts` — `GET` con
   `CRON_SECRET` para el cron, `POST` con el `access_token` de la
   sesión para el botón manual.
-- **Tablas**: `feeds` (id, name, url) y `feed_items` (feed_id, title,
+- **Tablas**: `feeds` (id, name, url, muted) y `feed_items` (feed_id, title,
   link, published_at, read, fetched_at, únicos por `(feed_id, link)`)
   — RLS de solo lectura para el usuario autenticado, y también
   `update` en `feed_items` porque el toggle de leído/no leído corre en
   el cliente (con la anon key, no la service_role). `news_summary` es
   igual a `daily_summary` (una fila por usuario, solo la función
   serverless escribe).
+- **Silenciar fuente** (chip → "silenciar"/"activar" al hover, columna
+  `feeds.muted`): una fuente silenciada sigue apareciendo como chip con
+  su conteo real, pero sus ítems se excluyen de "No leídas"/"Todas"
+  (`NewsApp.tsx`, `mutedFeedIds`) — salvo que se la filtre puntualmente
+  haciendo click en el chip, ahí se ve igual. Es una preferencia
+  persistida en la tabla `feeds` (RLS de `update` para el usuario
+  autenticado, igual que el toggle de leído en `feed_items`), no un
+  estado local.
 - **"→ todo"** (`NewsApp.tsx`, función `convertToTask`): arma una
   tarea nueva con `${título} ${link}` y la inserta directo con
   `insertTask` (mismo parser que Agenda, el link se detecta solo como

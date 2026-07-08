@@ -33,6 +33,9 @@ export interface Feed {
   id: string;
   name: string;
   url: string;
+  /** Still shows as a chip with its real count, but excluded from the
+   * combined "No leídas"/"Todas" views unless explicitly filtered to it. */
+  muted: boolean;
 }
 
 export interface FeedItem {

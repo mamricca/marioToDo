@@ -12,7 +12,7 @@ import {
   isToday,
   getErrorMessage,
 } from "./format";
-import { fetchFeeds, fetchFeedItems, setFeedItemRead } from "./lib/feedsApi";
+import { fetchFeeds, fetchFeedItems, setFeedItemRead, setFeedMuted } from "./lib/feedsApi";
 import { insertTask } from "./lib/tasksApi";
 import { fetchNewsSummary, regenerateNewsSummary } from "./lib/newsSummaryApi";
 import type { Feed, FeedItem, Mode, NewsView } from "./types";
@@ -78,6 +78,16 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
     }
   };
 
+  const toggleMute = async (feedId: string, muted: boolean) => {
+    setFeeds((prev) => prev.map((f) => (f.id === feedId ? { ...f, muted } : f)));
+    try {
+      await setFeedMuted(feedId, muted);
+    } catch (err) {
+      setFeeds((prev) => prev.map((f) => (f.id === feedId ? { ...f, muted: !muted } : f)));
+      setErrorMessage(getErrorMessage(err));
+    }
+  };
+
   const convertToTask = async (item: FeedItem) => {
     try {
       const raw = `${item.title} ${item.link}`;
@@ -90,10 +100,16 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
     }
   };
 
-  const viewItems = view === "unread" ? items.filter((i) => !i.read) : items;
-  const displayedItems = interleaveByFeed(
-    feedFilter ? viewItems.filter((i) => i.feedId === feedFilter) : viewItems
+  const mutedFeedIds = useMemo(
+    () => new Set(feeds.filter((f) => f.muted).map((f) => f.id)),
+    [feeds]
   );
+
+  const viewItems = view === "unread" ? items.filter((i) => !i.read) : items;
+  const scopedItems = feedFilter
+    ? viewItems.filter((i) => i.feedId === feedFilter)
+    : viewItems.filter((i) => !mutedFeedIds.has(i.feedId));
+  const displayedItems = interleaveByFeed(scopedItems);
 
   const unreadCount = items.filter((i) => !i.read).length;
   const newTodayCount = useMemo(
@@ -159,6 +175,7 @@ function NewsApp({ userId, userEmail, onSignOut, mode, onModeChange }: NewsAppPr
         viewItems={viewItems}
         feedFilter={feedFilter}
         onFeedFilterChange={setFeedFilter}
+        onToggleMute={toggleMute}
       />
 
       {loading ? (

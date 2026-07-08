@@ -406,6 +406,38 @@ input {
   text-underline-offset: 3px;
 }
 
+.chip.muted {
+  opacity: 0.4;
+}
+
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chip-mute {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.chip-wrap:hover .chip-mute {
+  opacity: 1;
+}
+
+.chip-mute:hover {
+  color: var(--ink);
+}
+
 .sort-bar {
   display: flex;
   align-items: center;

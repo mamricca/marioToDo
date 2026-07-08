@@ -58,6 +58,9 @@ create table if not exists public.feeds (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   url text not null unique,
+  -- sigue apareciendo como chip (con su conteo), pero se excluye de
+  -- "No leídas"/"Todas" salvo que se filtre esa fuente puntualmente.
+  muted boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -84,6 +87,11 @@ alter table public.feed_items enable row level security;
 create policy "Authenticated users can select feeds"
   on public.feeds for select
   using (auth.role() = 'authenticated');
+
+create policy "Authenticated users can update feed muted state"
+  on public.feeds for update
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 create policy "Authenticated users can select feed items"
   on public.feed_items for select
